@@ -125,7 +125,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () async {
               final newRoute = await Navigator.push<TransitRoute>(
                 context,
-                MaterialPageRoute(builder: (context) => const AddRouteScreen()),
+                MaterialPageRoute(
+                  // 💡 ここでもしっかり「timetables」を渡してあげる
+                  builder: (context) => AddRouteScreen(timetables: timetables),
+                ),
               );
               if (newRoute != null) {
                 setState(() {

@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:girinori/models/transit_model.dart';
 
-// 💡 もし TransitRoute や TransitSegment の定義が別の場所（modelsなど）にある場合は、ここにそのimportを足してください。
-// 例: import '../models/transit_model.dart';
-// main.dartに残したままなら: import '../main.dart'; （※構成に合わせて調整）
-
 class AddRouteScreen extends StatefulWidget {
-  const AddRouteScreen({super.key});
+  final Map<String, Map<int, List<int>>> timetables;
+
+  const AddRouteScreen({super.key, required this.timetables});
 
   @override
   State<AddRouteScreen> createState() => _AddRouteScreenState();
@@ -16,101 +14,85 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController(text: "マイ即帰宅ルート");
 
-  final _startStationController = TextEditingController(text: "中野");
-  final _firstLineController = TextEditingController(text: "東西線");
-  final _firstDurationController = TextEditingController(text: "20");
+  // 💡 初期表示は「出発駅」と「到着駅」の2つのみに修正！
+  final List<TextEditingController> _stationControllers = [
+    TextEditingController(text: "中野"), // index 0: 出発
+    TextEditingController(text: "渋谷"), // index 1: 到着
+  ];
 
-  final List<Map<String, TextEditingController>> _transferSteps = [];
-  final _endStationController = TextEditingController(text: "表参道");
+  // 💡 最初は経由地がないので、乗り換え徒歩時間リストは「空」からスタート
+  final List<TextEditingController> _walkTimeControllers = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _addTransferStepFields("大手町", "千代田線", "15", "1");
-  }
-
-  void _addTransferStepFields([
-    String station = "",
-    String line = "",
-    String dur = "",
-    String walk = "1",
-  ]) {
-    setState(() {
-      _transferSteps.add({
-        "station": TextEditingController(text: station),
-        "line": TextEditingController(text: line),
-        "duration": TextEditingController(text: dur),
-        "walk": TextEditingController(text: walk),
-      });
-    });
-  }
+  // 💡 最初は2駅（1区間）だけなので、路線枠も1つだけでスタート
+  final List<String?> _selectedLines = [null];
 
   @override
   void dispose() {
     _nameController.dispose();
-    _startStationController.dispose();
-    _firstLineController.dispose();
-    _firstDurationController.dispose();
-    _endStationController.dispose();
-    for (var step in _transferSteps) {
-      step.values.forEach((c) => c.dispose());
-    }
+    for (var c in _stationControllers) c.dispose();
+    for (var c in _walkTimeControllers) c.dispose();
     super.dispose();
   }
 
+  // 駅名から選択可能な路線リストを動的に抽出
+  List<String> _getAvailableLines(String stationName) {
+    if (stationName.isEmpty) return [];
+    return widget.timetables.keys
+        .where((key) => key.startsWith("${stationName}駅_"))
+        .map((key) => key.replaceFirst("${stationName}駅_", ""))
+        .toList();
+  }
+
+  // 💡 経由地を追加する（出発地と目的地の間に挟み込む）
+  void _addTransferStation() {
+    setState(() {
+      // 常に最後（目的地）の1つ手前に新しい経由駅を挿入
+      int insertIndex = _stationControllers.length - 1;
+
+      _stationControllers.insert(insertIndex, TextEditingController(text: ""));
+      _walkTimeControllers.add(TextEditingController(text: "3")); // 乗り換え時間を追加
+      _selectedLines.add(null); // 新しい区間の路線枠を追加
+    });
+  }
+
+  // 経由地を削除する
+  void _removeTransferStation(int index) {
+    if (_stationControllers.length <= 2) return;
+    setState(() {
+      _stationControllers.removeAt(index);
+      _walkTimeControllers.removeAt(index - 1); // 対応する乗り換え時間を削除
+      _selectedLines.removeAt(index - 1); // 対応する路線を削除
+    });
+  }
+
+  // 入力フォームからTransitSegmentの配列にコンパイル
   List<TransitSegment> _compileSegments() {
     List<TransitSegment> segments = [];
-
-    if (_transferSteps.isEmpty) {
+    for (int i = 0; i < _selectedLines.length; i++) {
       segments.add(
         TransitSegment(
-          departureStation: _startStationController.text,
-          line: _firstLineController.text,
-          duration: int.tryParse(_firstDurationController.text) ?? 0,
-          arrivalStation: _endStationController.text,
-          walkTimeAfter: 0,
+          departureStation: _stationControllers[i].text,
+          line: _selectedLines[i] ?? "",
+          duration: 15, // 固定値（Dashboard側の時刻表から自動計算されるためダミー）
+          arrivalStation: _stationControllers[i + 1].text,
+          walkTimeAfter: i < _walkTimeControllers.length
+              ? (int.tryParse(_walkTimeControllers[i].text) ?? 0)
+              : 0,
         ),
       );
-    } else {
-      segments.add(
-        TransitSegment(
-          departureStation: _startStationController.text,
-          line: _firstLineController.text,
-          duration: int.tryParse(_firstDurationController.text) ?? 0,
-          arrivalStation: _transferSteps.first["station"]!.text,
-          walkTimeAfter: int.tryParse(_transferSteps.first["walk"]!.text) ?? 0,
-        ),
-      );
-
-      for (int i = 0; i < _transferSteps.length; i++) {
-        final currentStep = _transferSteps[i];
-        final isLast = i == _transferSteps.length - 1;
-
-        segments.add(
-          TransitSegment(
-            departureStation: currentStep["station"]!.text,
-            line: currentStep["line"]!.text,
-            duration: int.tryParse(currentStep["duration"]!.text) ?? 0,
-            arrivalStation: isLast
-                ? _endStationController.text
-                : _transferSteps[i + 1]["station"]!.text,
-            walkTimeAfter: isLast
-                ? 0
-                : (int.tryParse(_transferSteps[i + 1]["walk"]!.text) ?? 0),
-          ),
-        );
-      }
     }
     return segments;
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentSegments = _compileSegments();
-
     return Scaffold(
+      backgroundColor: const Color(0xFF121214),
       appBar: AppBar(
-        title: const Text('即帰宅ルートの登録'),
+        title: const Text(
+          'ルートの作成',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
@@ -118,266 +100,83 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         key: _formKey,
         child: Column(
           children: [
+            // ルート名称入力
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8.0,
+              ),
+              child: _buildInputField(
+                _nameController,
+                "ルート名称",
+                "例: 平日の帰宅ルート",
+                icon: Icons.edit_road,
+              ),
+            ),
+            const Divider(color: Colors.white10, height: 1),
+
+            // メインタイムライン
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildInputField(
-                      _nameController,
-                      "ルート名",
-                      "例: 平日帰宅ルート",
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 24),
-
-                    _buildSectionTitle("1. 出発のベース設定"),
-                    Card(
-                      color: const Color(0xFF1E1E24),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    for (int i = 0; i < _stationControllers.length; i++) ...[
+                      // 🚉 駅ノード（出発・経由・到着）
+                      _buildStationNode(
+                        index: i,
+                        isStart: i == 0,
+                        isEnd: i == _stationControllers.length - 1,
                       ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            _buildInputField(
-                              _startStationController,
-                              "出発駅",
-                              "例: 中野",
-                              onChanged: (_) => setState(() {}),
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: _buildInputField(
-                                    _firstLineController,
-                                    "初めに使う路線",
-                                    "例: 東西線",
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: _buildInputField(
-                                    _firstDurationController,
-                                    "乗車時間 (分)",
-                                    "例: 20",
-                                    isNumber: true,
-                                    onChanged: (_) => setState(() {}),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+
+                      // ➔ 路線ノード（最後の駅の後ろには表示しない）
+                      if (i < _stationControllers.length - 1)
+                        _buildLineNode(index: i),
+                    ],
+
+                    const SizedBox(height: 16),
+                    // ➕ 経由地追加ボタン
+                    _buildAddStepButton(),
                     const SizedBox(height: 24),
-
-                    _buildSectionTitle("2. 乗り換え経由地の追加"),
-                    ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _transferSteps.length,
-                      itemBuilder: (context, index) {
-                        final step = _transferSteps[index];
-                        return Card(
-                          color: const Color(0xFF22222A),
-                          margin: const EdgeInsets.only(bottom: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      "乗り換え ➔ 第 ${index + 1} 経由地",
-                                      style: const TextStyle(
-                                        color: Color(0xFF00B0FF),
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(
-                                        Icons.remove_circle_outline,
-                                        color: Colors.redAccent,
-                                      ),
-                                      onPressed: () => setState(
-                                        () => _transferSteps.removeAt(index),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                _buildInputField(
-                                  step["station"]!,
-                                  "経由駅（乗換駅）",
-                                  "例: 大手町",
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                                const SizedBox(height: 12),
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: _buildInputField(
-                                        step["line"]!,
-                                        "次に乗る路線",
-                                        "例: 千代田線",
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: _buildInputField(
-                                        step["duration"]!,
-                                        "乗車時間 (分)",
-                                        "例: 15",
-                                        isNumber: true,
-                                        onChanged: (_) => setState(() {}),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                _buildInputField(
-                                  step["walk"]!,
-                                  "この駅での徒歩乗り換え時間 (分)",
-                                  "例: 1",
-                                  isNumber: true,
-                                  onChanged: (_) => setState(() {}),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF00B0FF),
-                        side: const BorderSide(color: Color(0xFF00B0FF)),
-                        minimumSize: const Size(double.infinity, 48),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      onPressed: () => _addTransferStepFields(),
-                      icon: const Icon(Icons.add_location_alt),
-                      label: const Text("さらに乗り換え（経由地）を追加"),
-                    ),
-                    const SizedBox(height: 24),
-
-                    _buildSectionTitle("3. 最終目的地"),
-                    _buildInputField(
-                      _endStationController,
-                      "目的地（帰宅駅）",
-                      "例: 渋谷",
-                      onChanged: (_) => setState(() {}),
-                    ),
-                    const SizedBox(height: 30),
                   ],
                 ),
               ),
             ),
 
-            // 下部プレビュー
+            // 登録ボタン
             Container(
+              padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
                 color: Color(0xFF1E1E24),
-                border: Border(
-                  top: BorderSide(color: Colors.white10, width: 1),
-                ),
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
+                border: Border(top: BorderSide(color: Colors.white10)),
               ),
-              padding: const EdgeInsets.all(20),
               child: SafeArea(
-                top: false,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      "👀 ルート完成予想図 (プレビュー)",
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                      ),
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF00E676),
+                    foregroundColor: Colors.black,
+                    minimumSize: const Size(double.infinity, 54),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                    const SizedBox(height: 12),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildPreviewStation(
-                            currentSegments.first.departureStation,
-                            isStart: true,
-                          ),
-                          for (int i = 0; i < currentSegments.length; i++) ...[
-                            _buildPreviewLine(
-                              currentSegments[i].line,
-                              currentSegments[i].duration,
-                            ),
-                            if (i < currentSegments.length - 1) ...[
-                              _buildPreviewStation(
-                                currentSegments[i].arrivalStation,
-                              ),
-                              _buildPreviewWalk(
-                                currentSegments[i].walkTimeAfter,
-                              ),
-                            ] else ...[
-                              _buildPreviewStation(
-                                currentSegments[i].arrivalStation,
-                                isEnd: true,
-                              ),
-                            ],
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00E676),
-                        foregroundColor: Colors.black,
-                        minimumSize: const Size(double.infinity, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
+                    elevation: 0,
+                  ),
+                  onPressed: () {
+                    if (_formKey.currentState!.validate()) {
+                      Navigator.pop(
+                        context,
+                        TransitRoute(
+                          id: DateTime.now().toString(),
+                          name: _nameController.text,
+                          segments: _compileSegments(),
                         ),
-                      ),
-                      onPressed: () {
-                        if (_formKey.currentState!.validate()) {
-                          Navigator.pop(
-                            context,
-                            TransitRoute(
-                              id: DateTime.now().toString(),
-                              name: _nameController.text,
-                              segments: _compileSegments(),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text(
-                        "このパイプラインを確定保存",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  ],
+                      );
+                    }
+                  },
+                  child: const Text(
+                    "このルートを登録する",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
                 ),
               ),
             ),
@@ -387,126 +186,214 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
+  // --- 🚉 UIコンポーネント: 駅ノード ---
+  Widget _buildStationNode({
+    required int index,
+    bool isStart = false,
+    bool isEnd = false,
+  }) {
+    String label = isStart ? "出発駅" : (isEnd ? "到着駅" : "経由駅 $index");
+    Color themeColor = isStart
+        ? const Color(0xFF00E676)
+        : (isEnd ? Colors.redAccent : const Color(0xFF00B0FF));
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // 左側: タイムラインのピン
+        Column(
+          children: [
+            Container(
+              width: 2,
+              height: 10,
+              color: isStart ? Colors.transparent : Colors.white24,
+            ),
+            Icon(
+              isStart
+                  ? Icons.radio_button_checked
+                  : (isEnd ? Icons.location_on : Icons.brightness_1),
+              color: themeColor,
+              size: 22,
+            ),
+            Container(
+              width: 2,
+              height: 10,
+              color: isEnd ? Colors.transparent : Colors.white24,
+            ),
+          ],
+        ),
+        const SizedBox(width: 16),
+
+        // 中央: 駅名入力
+        Expanded(
+          flex: 4,
+          child: _buildInputField(
+            _stationControllers[index],
+            label,
+            "駅名を入力",
+            onChanged: (_) => setState(() {}),
+          ),
+        ),
+
+        // 経由駅のすぐ横に「乗り換え時間入力」を配置
+        if (!isStart && !isEnd) ...[
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: _buildInputField(
+              _walkTimeControllers[index - 1],
+              "乗換(分)",
+              "分",
+              isNumber: true,
+              icon: Icons.directions_walk,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.remove_circle_outline,
+              color: Colors.redAccent,
+            ),
+            onPressed: () => _removeTransferStation(index),
+          ),
+        ] else ...[
+          const SizedBox(width: 56), // 出発・到着駅の右側スペース埋め
+        ],
+      ],
+    );
+  }
+
+  // --- ➔ UIコンポーネント: 路線ノード ---
+  Widget _buildLineNode({required int index}) {
+    String previousStation = _stationControllers[index].text;
+    List<String> availableLines = _getAvailableLines(previousStation);
+
+    if (!availableLines.contains(_selectedLines[index])) {
+      _selectedLines[index] = null;
+    }
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 左側: タイムラインの縦線
+        Padding(
+          padding: const EdgeInsets.only(left: 10.0),
+          child: Container(
+            width: 2,
+            height: 60,
+            color: const Color(0xFF00B0FF),
+          ),
+        ),
+        const SizedBox(width: 24),
+
+        // 利用路線選択
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E24),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: DropdownButtonFormField<String>(
+              value: _selectedLines[index],
+              hint: Text(
+                availableLines.isEmpty ? "上の駅名を入力してください" : "利用路線を選択",
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
+              dropdownColor: const Color(0xFF1E1E24),
+              decoration: const InputDecoration(
+                labelText: "利用路線",
+                border: InputBorder.none,
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 4,
+                ),
+              ),
+              items: availableLines.map((String line) {
+                return DropdownMenuItem<String>(
+                  value: line,
+                  child: Text(
+                    line,
+                    style: const TextStyle(fontSize: 14, color: Colors.white),
+                  ),
+                );
+              }).toList(),
+              onChanged: (newValue) {
+                setState(() {
+                  _selectedLines[index] = newValue;
+                });
+              },
+              validator: (value) => value == null ? '路線を選択してください' : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // --- ➕ UIコンポーネント: 経由地追加ボタン ---
+  Widget _buildAddStepButton() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10.0, left: 4),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.white70,
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          letterSpacing: 1.1,
+      padding: const EdgeInsets.only(left: 36.0),
+      child: OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFF00B0FF),
+          side: const BorderSide(color: Color(0xFF00B0FF), width: 1.5),
+          minimumSize: const Size(double.infinity, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+        ),
+        onPressed: _addTransferStation,
+        icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+        label: const Text(
+          "経由地（乗り換え駅）を追加",
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ),
     );
   }
 
+  // 共通テキストフィールド
   Widget _buildInputField(
     TextEditingController controller,
     String label,
     String hint, {
     bool isNumber = false,
+    IconData? icon,
     ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       onChanged: onChanged,
+      style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
+        prefixIcon: icon != null
+            ? Icon(icon, size: 16, color: Colors.orange)
+            : null,
         filled: true,
         fillColor: const Color(0xFF121214),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: Color(0xFF00E676), width: 1),
         ),
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 14,
+          horizontal: 10,
+          vertical: 10,
         ),
       ),
-      validator: (value) => (value == null || value.isEmpty) ? '入力必須' : null,
-    );
-  }
-
-  Widget _buildPreviewStation(
-    String name, {
-    bool isStart = false,
-    bool isEnd = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: isStart
-            ? const Color(0xFF00E676).withOpacity(0.2)
-            : (isEnd ? Colors.redAccent.withOpacity(0.2) : Colors.white10),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: isStart
-              ? const Color(0xFF00E676)
-              : (isEnd ? Colors.redAccent : Colors.white24),
-        ),
-      ),
-      child: Text(
-        name.isEmpty ? "駅名" : name,
-        style: TextStyle(
-          fontSize: 13,
-          fontWeight: FontWeight.bold,
-          color: isStart
-              ? const Color(0xFF00E676)
-              : (isEnd ? Colors.redAccent : Colors.white),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPreviewLine(String name, int duration) {
-    return Row(
-      children: [
-        Container(width: 16, height: 2, color: const Color(0xFF00B0FF)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: const Color(0xFF00B0FF).withOpacity(0.1),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            "${name.isEmpty ? '路線' : name} (${duration}分)",
-            style: const TextStyle(color: Color(0xFF00B0FF), fontSize: 11),
-          ),
-        ),
-        Container(width: 16, height: 2, color: const Color(0xFF00B0FF)),
-      ],
-    );
-  }
-
-  Widget _buildPreviewWalk(int minutes) {
-    return Row(
-      children: [
-        const Text(" ➔ ", style: TextStyle(color: Colors.orange)),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: Colors.orange.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Text(
-            "🚶 $minutes分",
-            style: const TextStyle(
-              color: Colors.orange,
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const Text(" ➔ ", style: TextStyle(color: Colors.orange)),
-      ],
+      validator: (value) {
+        if (value == null || value.isEmpty) return '必須';
+        if (isNumber && int.tryParse(value) == null) return '数値';
+        return null;
+      },
     );
   }
 }
