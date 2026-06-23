@@ -328,7 +328,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       top: 4.0,
                       bottom: 4.0,
                     ),
-                    child: _buildRouteTimelineCard(myRoutes[index]),
+                    child: GestureDetector(
+                      onTap: () async {
+                        // 💡 編集画面（AddRouteScreen）へ、現在のルートデータを「editingRoute」として渡す
+                        final updatedRoute = await Navigator.push<TransitRoute>(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddRouteScreen(
+                              routeMaster: myLoadedRouteMaster,
+                              editingRoute:
+                                  myRoutes[index], // 👈 ここで現在のデータを引き渡す！
+                            ),
+                          ),
+                        );
+
+                        // 💡 編集画面から保存されてデータが戻ってきたら、リストを更新する
+                        if (updatedRoute != null) {
+                          setState(() => _isLoading = true);
+
+                          // 新しい路線が含まれているかもしれないので、念のため時刻表ファイルを再ロード
+                          for (var segment in updatedRoute.segments) {
+                            if (segment.line.isNotEmpty) {
+                              await _loadTimetableFileForLine(segment.line);
+                            }
+                          }
+
+                          setState(() {
+                            myRoutes[index] =
+                                updatedRoute; // 👈 該当インデックスのルートを最新版に差し替える
+                            _isLoading = false;
+                          });
+                        }
+                      },
+                      child: _buildRouteTimelineCard(myRoutes[index]),
+                    ),
                   );
                 },
               ),

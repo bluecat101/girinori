@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:girinori/models/transit_model.dart';
 
 class AddRouteScreen extends StatefulWidget {
-  // final Map<String, Map<int, List<int>>> timetables;
   final Map<String, Map<String, List<dynamic>>> routeMaster;
+  final TransitRoute? editingRoute; // 👈 💡 nullなら新規作成、データがあれば「編集モード」と判定できる
 
-  // const AddRouteScreen({super.key, required this.timetables});
-  const AddRouteScreen({super.key, required this.routeMaster}); // 👈 引数を変更
+  const AddRouteScreen({
+    super.key,
+    required this.routeMaster,
+    this.editingRoute, // 👈 💡 これを追加
+  });
 
   @override
   State<AddRouteScreen> createState() => _AddRouteScreenState();
@@ -14,25 +17,65 @@ class AddRouteScreen extends StatefulWidget {
 
 class _AddRouteScreenState extends State<AddRouteScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController(text: "マイ即帰宅ルート");
 
-  // 💡 初期表示は「出発駅」と「到着駅」の2つのみに修正！
-  final List<TextEditingController> _stationControllers = [
-    TextEditingController(text: "中野"), // index 0: 出発
-    TextEditingController(text: "渋谷"), // index 1: 到着
-  ];
-
-  // 💡 最初は経由地がないので、乗り換え徒歩時間リストは「空」からスタート
+  // 💡 【修正①】変数の「宣言」はここでまとめて行う（中身は initState で入れるので late をつける）
+  late TextEditingController _nameController;
+  final List<TextEditingController> _stationControllers = [];
   final List<TextEditingController> _walkTimeControllers = [];
+  final List<String?> _selectedLines = [];
 
-  // 💡 最初は2駅（1区間）だけなので、路線枠も1つだけでスタート
-  final List<String?> _selectedLines = [null];
+  // ❌ 以前あった「get _stationControllers => null;」の行は完全に削除してください！
+
+  @override
+  void initState() {
+    super.initState();
+
+    // 💡 【修正②】widget.editingRoute にデータが入っているか（編集モードか）チェック
+    if (widget.editingRoute != null) {
+      final route = widget.editingRoute!;
+
+      // 1. ルート名を復元してセット（※型名の late や var は付けずに、上の変数に代入する）
+      _nameController = TextEditingController(text: route.name);
+
+      // 2. 各セグメント（区間）から駅名、路線名、乗換時間を復元
+      for (int i = 0; i < route.segments.length; i++) {
+        _stationControllers.add(
+          TextEditingController(text: route.segments[i].departureStation),
+        );
+        _selectedLines.add(route.segments[i].line);
+
+        if (i < route.segments.length - 1 ||
+            route.segments[i].walkTimeAfter > 0) {
+          _walkTimeControllers.add(
+            TextEditingController(
+              text: route.segments[i].walkTimeAfter.toString(),
+            ),
+          );
+        }
+      }
+      // 3. 最終の到着駅を末尾に追加
+      _stationControllers.add(
+        TextEditingController(text: route.segments.last.arrivalStation),
+      );
+    } else {
+      // 💡 【修正③】データが空（新規作成）なら、従来通りの初期値をセット
+      _nameController = TextEditingController(text: "マイ即帰宅ルート");
+      _stationControllers.add(TextEditingController(text: "中野"));
+      _stationControllers.add(TextEditingController(text: "渋谷"));
+      _selectedLines.add(null);
+    }
+  }
 
   @override
   void dispose() {
+    // 💡 【修正④】初期化されたコントローラーたちを安全に解放する
     _nameController.dispose();
-    for (var c in _stationControllers) c.dispose();
-    for (var c in _walkTimeControllers) c.dispose();
+    for (var c in _stationControllers) {
+      c.dispose();
+    }
+    for (var c in _walkTimeControllers) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -106,10 +149,20 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
+      // appBar: AppBar(
+      //   title: const Text(
+      //     'ルートの作成',
+      //     style: TextStyle(fontWeight: FontWeight.bold),
+      //   ),
+      //   backgroundColor: Colors.transparent,
+      //   elevation: 0,
+      // ),
       appBar: AppBar(
-        title: const Text(
-          'ルートの作成',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: Text(
+          widget.editingRoute != null
+              ? 'ルートの編集'
+              : 'ルートの作成', // 👈 💡 const は外してください
+          style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -169,9 +222,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                 border: Border(top: BorderSide(color: Colors.white10)),
               ),
               child: SafeArea(
+                // 色と文字を「編集モード」に連動させる
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00E676),
+                    // 💡 編集ならオレンジ（Colors.orangeAccent）、新規なら緑
+                    backgroundColor: widget.editingRoute != null
+                        ? Colors.orangeAccent
+                        : const Color(0xFF00E676),
                     foregroundColor: Colors.black,
                     minimumSize: const Size(double.infinity, 54),
                     shape: RoundedRectangleBorder(
@@ -184,16 +241,22 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                       Navigator.pop(
                         context,
                         TransitRoute(
-                          id: DateTime.now().toString(),
+                          id: widget.editingRoute != null
+                              ? widget.editingRoute!.id
+                              : DateTime.now().toString(),
                           name: _nameController.text,
                           segments: _compileSegments(),
                         ),
                       );
                     }
                   },
-                  child: const Text(
-                    "このルートを登録する",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  // 💡 編集なら「変更を保存する」、新規なら「このルートを登録する」
+                  child: Text(
+                    widget.editingRoute != null ? "変更を保存する" : "このルートを登録する",
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
                   ),
                 ),
               ),
