@@ -1,22 +1,8 @@
+import 'dart:convert'; // 💡 JSONパースに必要です
+import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
-
-// 擬似的な時刻表データ
-final Map<String, Map<int, List<int>>> mockTimetables = {
-  "中野駅_東西線": {
-    18: [0, 10, 20, 30, 40, 50],
-    19: [0, 10, 20, 30, 40, 50],
-  },
-  "大手町駅_千代田線": {
-    18: [5, 18, 30, 42, 55],
-    19: [5, 18, 30, 42, 55],
-  },
-  "表参道駅_半蔵門線": {
-    18: [3, 13, 23, 33, 43, 53],
-    19: [3, 13, 23, 33, 43, 53],
-  },
-};
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -26,57 +12,26 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  // 💡 見え方をテストしやすいようにルートを3つに用意
+  // 💡 【新設計】クローラーが作った駅マスタを保持する変数
+  Map<String, Map<String, List<dynamic>>> myLoadedRouteMaster = {};
+
+  // 💡 【新設計】現在表示しているルートで使う路線の時刻表データ（trips）だけを小分けにキャッシュする場所
+  // Key: "ＪＲ根岸線_大宮・南浦和方面"、 Value: その路線の trips 配列
+  final Map<String, List<dynamic>> _cachedTimetables = {};
+
+  bool _isLoading = true; // 駅マスタと初期ルートのファイル読み込み管理フラグ
+
+  // 💡 ユーザーが登録したルートのリスト（prefixがクローラー仕様の日本語になっています）
   List<TransitRoute> myRoutes = [
     TransitRoute(
       id: "route_1",
-      name: "大手町経由",
+      name: "根岸線・大宮方面",
       segments: [
         TransitSegment(
-          departureStation: "中野",
-          line: "東西線",
-          duration: 20,
-          arrivalStation: "大手町",
-          walkTimeAfter: 3,
-        ),
-        TransitSegment(
-          departureStation: "大手町",
-          line: "千代田線",
+          departureStation: "大船",
+          line: "ＪＲ根岸線_大宮・南浦和方面", // 👈 クローラーのprefix（ファイル名）と完全一致させる
           duration: 15,
-          arrivalStation: "表参道",
-          walkTimeAfter: 0,
-        ),
-      ],
-    ),
-    TransitRoute(
-      id: "route_2",
-      name: "直行バス",
-      segments: [
-        TransitSegment(
-          departureStation: "中野",
-          line: "東西線",
-          duration: 35,
-          arrivalStation: "表参道",
-          walkTimeAfter: 0,
-        ),
-      ],
-    ),
-    TransitRoute(
-      id: "route_3",
-      name: "新宿経由",
-      segments: [
-        TransitSegment(
-          departureStation: "中野",
-          line: "中央線",
-          duration: 5,
-          arrivalStation: "新宿",
-          walkTimeAfter: 5,
-        ),
-        TransitSegment(
-          departureStation: "新宿",
-          line: "山手線",
-          duration: 15,
-          arrivalStation: "渋谷",
+          arrivalStation: "磯子",
           walkTimeAfter: 0,
         ),
       ],
@@ -84,17 +39,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ];
 
   final Map<String, TimeOfDay> _routeBaseTimes = {};
-
-  // 💡 2個しっかりと表示され、3個目が少し見切れる魔法の比率 (43%)
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    for (var route in myRoutes) {
-      _routeBaseTimes[route.id] = TimeOfDay(hour: now.hour, minute: now.minute);
-    }
+    // 起動時にまず駅マスタと、初期ルートに必要な時刻表ファイルを一括ロードする
+    _initializeData();
   }
 
   @override
@@ -103,38 +54,170 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.dispose();
   }
 
-  TimeOfDay _findNextTrain(
-    String station,
-    String line,
-    TimeOfDay baseTime, {
+  // 💡 【新設計】初期化処理：マスタを読んだあと、初期ルートの時刻表もまとめてロード
+  Future<void> _initializeData() async {
+    await _loadRouteMasterFile();
+
+    // 現在登録されているルートが使用する路線ファイルをすべて先読みする
+    for (var route in myRoutes) {
+      for (var segment in route.segments) {
+        if (segment.line.isNotEmpty) {
+          await _loadTimetableFileForLine(segment.line);
+        }
+      }
+    }
+
+    // 基準時刻を現在時刻に初期化
+    final now = DateTime.now();
+    for (var route in myRoutes) {
+      _routeBaseTimes[route.id] = TimeOfDay(hour: now.hour, minute: now.minute);
+    }
+
+    setState(() {
+      _isLoading = false; // すべての準備が完了！
+    });
+  }
+
+  // 💡 【新設計】assets から route_master.json を非同期でロードする
+  Future<void> _loadRouteMasterFile() async {
+    try {
+      final jsonString = await rootBundle.loadString(
+        'assets/route_master.json',
+      );
+      final Map<String, dynamic> rawMap = jsonDecode(jsonString);
+      final Map<String, Map<String, List<dynamic>>> formattedMaster = {};
+
+      rawMap.forEach((station, routes) {
+        final Map<String, List<dynamic>> routeMap = {};
+        if (routes is Map<String, dynamic>) {
+          routes.forEach((lineId, stopStations) {
+            if (stopStations is List) {
+              routeMap[lineId] = stopStations;
+            }
+          });
+        }
+        formattedMaster[station] = routeMap;
+      });
+
+      myLoadedRouteMaster = formattedMaster;
+      print("🚀 駅マスタのロード成功（${myLoadedRouteMaster.length}駅）");
+    } catch (e) {
+      print("❌ 駅マスタのロード失敗: $e");
+    }
+  }
+
+  // 💡 【新設計】必要な路線の個別時刻表ファイル（timetable_xxx.json）をピンポイントでオンデマンド読込
+  Future<void> _loadTimetableFileForLine(String lineId) async {
+    // すでにロード済み（キャッシュにある）なら何もしない（メモリの節約）
+    if (_cachedTimetables.containsKey(lineId)) return;
+
+    try {
+      // 禁止文字を安全に置換したファイル名を指定
+      final safeFilename = lineId.replaceAll(RegExp(r'[\\/:*?"<>|]'), "_");
+      final jsonString = await rootBundle.loadString(
+        'assets/timetables/$safeFilename.json',
+      );
+      final Map<String, dynamic> lineData = jsonDecode(jsonString);
+
+      if (lineData.containsKey('trips')) {
+        _cachedTimetables[lineId] = lineData['trips'] as List<dynamic>;
+        print(
+          "🚊 路線ファイルのロード成功: timetable_$safeFilename.json (${_cachedTimetables[lineId]!.length}本収容)",
+        );
+      }
+    } catch (e) {
+      print("❌ 路線ファイル [ $lineId ] のロードに失敗しました（ファイルがないかアセット未登録）: $e");
+    }
+  }
+
+  // 💡 【今日が平日、土曜、日祝のどれかを判定するユーティリティ】
+  String _getTodayDayType() {
+    final now = DateTime.now();
+    if (now.weekday == DateTime.saturday) {
+      return "saturday";
+    } else if (now.weekday == DateTime.sunday) {
+      return "sunday";
+    }
+    return "weekday";
+  }
+
+  (TimeOfDay, TimeOfDay) _findNextTrainTimes({
+    required String lineId,
+    required String departureStation,
+    required String arrivalStation,
+    required TimeOfDay baseTime,
     bool isPrevious = false,
   }) {
-    final key = "${station}駅_$line";
-    final table = mockTimetables[key];
-    if (table == null) return baseTime;
+    final jsonTrips = _cachedTimetables[lineId];
+    if (jsonTrips == null) return (baseTime, baseTime);
 
-    List<TimeOfDay> allTrains = [];
-    table.forEach((hour, minutes) {
-      for (var min in minutes) {
-        allTrains.add(TimeOfDay(hour: hour, minute: min));
+    final dayType = _getTodayDayType();
+    int baseMinutes = baseTime.hour * 60 + baseTime.minute;
+
+    List<Map<String, dynamic>> validTrips = [];
+    List<int> depMinutesList = [];
+
+    for (var trip in jsonTrips) {
+      if (trip['day_type'] != dayType) continue;
+
+      final stopTimes = trip['stop_times'] as Map<String, dynamic>;
+      final depTiming = stopTimes[departureStation];
+      final arrTiming = stopTimes[arrivalStation];
+
+      if (depTiming == null || arrTiming == null) continue;
+
+      int? depMin = depTiming['dep'] ?? depTiming['arr'];
+      if (depMin != null) {
+        validTrips.add(trip);
+        depMinutesList.add(depMin);
       }
-    });
-    allTrains.sort(
-      (a, b) => (a.hour * 60 + a.minute).compareTo(b.hour * 60 + b.minute),
-    );
-    final baseTotal = baseTime.hour * 60 + baseTime.minute;
-
-    if (isPrevious) {
-      final prevTrains = allTrains
-          .where((t) => (t.hour * 60 + t.minute) < baseTotal)
-          .toList();
-      return prevTrains.isNotEmpty ? prevTrains.last : baseTime;
-    } else {
-      final nextTrains = allTrains
-          .where((t) => (t.hour * 60 + t.minute) >= baseTotal)
-          .toList();
-      return nextTrains.isNotEmpty ? nextTrains.first : baseTime;
     }
+
+    if (depMinutesList.isEmpty) return (baseTime, baseTime);
+
+    int targetIndex = 0;
+    if (isPrevious) {
+      int maxPrev = -1;
+      for (int i = 0; i < depMinutesList.length; i++) {
+        if (depMinutesList[i] < baseMinutes && depMinutesList[i] > maxPrev) {
+          maxPrev = depMinutesList[i];
+          targetIndex = i;
+        }
+      }
+      if (maxPrev == -1) return (baseTime, baseTime);
+    } else {
+      int minNext = 9999;
+      for (int i = 0; i < depMinutesList.length; i++) {
+        if (depMinutesList[i] >= baseMinutes && depMinutesList[i] < minNext) {
+          minNext = depMinutesList[i];
+          targetIndex = i;
+        }
+      }
+      if (minNext == 9999) {
+        int minStart = 9999;
+        for (int i = 0; i < depMinutesList.length; i++) {
+          if (depMinutesList[i] < minStart) {
+            minStart = depMinutesList[i];
+            targetIndex = i;
+          }
+        }
+      }
+    }
+
+    final targetTrip = validTrips[targetIndex];
+    final targetStopTimes = targetTrip['stop_times'] as Map<String, dynamic>;
+
+    int finalDepMin =
+        targetStopTimes[departureStation]['dep'] ??
+        targetStopTimes[departureStation]['arr'];
+    int finalArrMin =
+        targetStopTimes[arrivalStation]['arr'] ??
+        targetStopTimes[arrivalStation]['dep'];
+
+    return (
+      TimeOfDay(hour: (finalDepMin ~/ 60) % 24, minute: finalDepMin % 60),
+      TimeOfDay(hour: (finalArrMin ~/ 60) % 24, minute: finalArrMin % 60),
+    );
   }
 
   TimeOfDay _addMinutes(TimeOfDay time, int minutes) {
@@ -153,18 +236,33 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }) {
     setState(() {
       final currentTime = _routeBaseTimes[routeId] ?? TimeOfDay.now();
-      final targetTrain = _findNextTrain(
-        segment.departureStation,
-        segment.line,
-        isNext ? _addMinutes(currentTime, 1) : currentTime,
+
+      // 💡 修正：新設した _findNextTrainTimes を使い、(出発, 到着) のうち [出発（$1）] だけを時間送りに利用する
+      final times = _findNextTrainTimes(
+        lineId: segment.line,
+        departureStation: segment.departureStation,
+        arrivalStation: segment.arrivalStation, // 👈 追加
+        baseTime: isNext ? _addMinutes(currentTime, 1) : currentTime,
         isPrevious: !isNext,
       );
-      _routeBaseTimes[routeId] = targetTrain;
+
+      // Dartのタプルから1個目（出発時刻）を取り出すときは . $1 と書きます
+      _routeBaseTimes[routeId] = times.$1;
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    // 💡 起動時のファイルロードを待つ安全弁
+    if (_isLoading) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121214),
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFF00E676)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
       appBar: AppBar(
@@ -182,14 +280,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
               size: 26,
             ),
             onPressed: () async {
+              // 💡 画面遷移時にロード済みの routeMaster を引き渡す
               final newRoute = await Navigator.push<TransitRoute>(
                 context,
                 MaterialPageRoute(
                   builder: (context) =>
-                      AddRouteScreen(timetables: mockTimetables),
+                      AddRouteScreen(routeMaster: myLoadedRouteMaster),
                 ),
               );
+
               if (newRoute != null) {
+                // 💡 新しいルートが追加されたら、そのルートが使う路線ファイルをその場で動的に追加ロードする！
+                setState(() => _isLoading = true);
+                for (var segment in newRoute.segments) {
+                  if (segment.line.isNotEmpty) {
+                    await _loadTimetableFileForLine(segment.line);
+                  }
+                }
+
                 setState(() {
                   myRoutes.add(newRoute);
                   final now = DateTime.now();
@@ -197,7 +305,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     hour: now.hour,
                     minute: now.minute,
                   );
+                  _isLoading = false;
                 });
+
                 _pageController.animateToPage(
                   myRoutes.length - 1,
                   duration: const Duration(milliseconds: 300),
@@ -220,7 +330,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: PageView.builder(
                 controller: _pageController,
                 itemCount: myRoutes.length,
-                padEnds: false, // 💡 左端に寄せることで、右側に見切れを作る
+                padEnds: false,
                 itemBuilder: (context, index) {
                   return Padding(
                     padding: const EdgeInsets.only(
@@ -236,7 +346,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- 📦 横幅が狭いスリムカード ---
   Widget _buildRouteTimelineCard(TransitRoute route) {
     final baseTime = _routeBaseTimes[route.id] ?? TimeOfDay.now();
     List<TimeOfDay> departureTimes = [];
@@ -245,10 +354,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     for (int i = 0; i < route.segments.length; i++) {
       final seg = route.segments[i];
-      final dep = _findNextTrain(seg.departureStation, seg.line, runningTime);
+
+      // 💡 修正：出発駅と到着駅を両方渡して、JSONから本物の時刻をペアで抜く！
+      final (dep, arr) = _findNextTrainTimes(
+        lineId: seg.line,
+        departureStation: seg.departureStation,
+        arrivalStation: seg.arrivalStation, // 👈 目的地の駅名
+        baseTime: runningTime,
+      );
+
       departureTimes.add(dep);
-      final arr = _addMinutes(dep, seg.duration);
-      arrivalTimes.add(arr);
+      arrivalTimes.add(arr); // 💡 これで「1229」がそのまま格納されます！
+
+      // 次の乗り換えがある場合は、本物の到着時刻に徒歩時間を足す
       runningTime = _addMinutes(arr, seg.walkTimeAfter);
     }
 
@@ -263,7 +381,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ルート名
             Text(
               route.name,
               maxLines: 1,
@@ -275,7 +392,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const SizedBox(height: 4),
-            // 最速到着時間
             Text(
               "${_formatTime(arrivalTimes.last)} 着",
               style: const TextStyle(
@@ -285,33 +401,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ),
             const Divider(color: Colors.white10, height: 16),
-
-            // タイムライン本体
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
                   children: [
                     for (int i = 0; i < route.segments.length; i++) ...[
-                      // ⭕️ 1箇所目：出発駅・経由駅の呼び出し
                       _buildStationRow(
                         routeId: route.id,
                         stationName: route.segments[i].departureStation,
-                        arrivalTime: i == 0
-                            ? null
-                            : arrivalTimes[i - 1], // 前の区間の到着時間
-                        departureTime: departureTimes[i], // この区間の出発時間
+                        arrivalTime: i == 0 ? null : arrivalTimes[i - 1],
+                        departureTime: departureTimes[i],
                         segment: route.segments[i],
                         isStart: i == 0,
                         isEnd: false,
                       ),
                       _buildLineRow(route.segments[i].line),
                     ],
-                    // ⭕️ 2箇所目：最終到着駅の呼び出し
                     _buildStationRow(
                       routeId: route.id,
                       stationName: route.segments.last.arrivalStation,
-                      arrivalTime: arrivalTimes.last, // 最終到着時間
-                      departureTime: null, // 到着駅なので出発時間はなし
+                      arrivalTime: arrivalTimes.last,
+                      departureTime: null,
                       segment: route.segments.last,
                       isStart: false,
                       isEnd: true,
@@ -326,8 +436,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- 🚉 縦並び駅要素（幅150px前後に耐えるスリム設計） ---
-  // --- 🚉 縦並び駅要素（到着時間を上に配置した新レイアウト） ---
   // --- 🚉 縦並び駅要素（「着 ➔ 駅名 ➔ 発」の3段レイアウト） ---
   Widget _buildStationRow({
     required String routeId,
@@ -345,7 +453,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // ピン
         Icon(
           isStart
               ? Icons.radio_button_checked
@@ -354,14 +461,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
           size: 14,
         ),
         const SizedBox(width: 8),
-
-        // 💡 中央：上から「着」➔「駅名」➔「発」の3段コンポーネント
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 1. 上段：到着時間（出発地以外に表示）
               if (arrivalTime != null)
                 Text(
                   "${_formatTime(arrivalTime)}着",
@@ -371,10 +475,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     fontWeight: FontWeight.w500,
                   ),
                 ),
-
               const SizedBox(height: 1),
-
-              // 2. 中段：駅名
               Text(
                 stationName,
                 maxLines: 1,
@@ -385,10 +486,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   color: isEnd ? Colors.redAccent : Colors.white,
                 ),
               ),
-
               const SizedBox(height: 1),
-
-              // 3. 下段：出発時間（目的地以外に表示）
               if (departureTime != null)
                 Text(
                   "${_formatTime(departureTime)}発",
@@ -403,8 +501,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
         ),
-
-        // 最右翼：時刻シフトボタン（出発地と経由地のみ）
         if (!isEnd)
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -439,6 +535,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- ➔ 路線要素（スリム化） ---
   Widget _buildLineRow(String lineName) {
+    // 💡 画面表示用に prefix（ＪＲ根岸線_大宮・南浦和方面）から路線名だけを切り出す
+    final cleanName = lineName.split('_')[0];
+
     return Row(
       children: [
         Padding(
@@ -452,7 +551,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            lineName,
+            cleanName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(

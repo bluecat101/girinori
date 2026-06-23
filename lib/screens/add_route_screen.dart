@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:girinori/models/transit_model.dart';
 
 class AddRouteScreen extends StatefulWidget {
-  final Map<String, Map<int, List<int>>> timetables;
+  // final Map<String, Map<int, List<int>>> timetables;
+  final Map<String, Map<String, List<dynamic>>> routeMaster;
 
-  const AddRouteScreen({super.key, required this.timetables});
+  // const AddRouteScreen({super.key, required this.timetables});
+  const AddRouteScreen({super.key, required this.routeMaster}); // 👈 引数を変更
 
   @override
   State<AddRouteScreen> createState() => _AddRouteScreenState();
@@ -34,13 +36,29 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     super.dispose();
   }
 
-  // 駅名から選択可能な路線リストを動的に抽出
-  List<String> _getAvailableLines(String stationName) {
-    if (stationName.isEmpty) return [];
-    return widget.timetables.keys
-        .where((key) => key.startsWith("${stationName}駅_"))
-        .map((key) => key.replaceFirst("${stationName}駅_", ""))
-        .toList();
+  // 💡 出発駅と到着駅の「両方」を結ぶ路線だけを route_master.json から動的に抽出する
+  List<String> _getAvailableLines(int segmentIndex) {
+    // 現在の区間の出発駅と到着駅を取得
+    String depStation = _stationControllers[segmentIndex].text.trim();
+    String arrStation = _stationControllers[segmentIndex + 1].text.trim();
+
+    if (depStation.isEmpty || arrStation.isEmpty) return [];
+
+    // 駅マスタ（widget.routeMaster）から出発駅の情報を引く
+    final depStationData = widget.routeMaster[depStation];
+    if (depStationData == null) return [];
+
+    List<String> validLines = [];
+
+    // 出発駅が持っている全路線をループ
+    depStationData.forEach((lineId, stopStations) {
+      // 💡 その路線の「停車駅リスト」の中に、到着駅（arrStation）が含まれているかチェック！
+      if (stopStations.contains(arrStation)) {
+        validLines.add(lineId); // 条件に合う路線（例: ＪＲ根岸線_大宮・南浦和方面）だけをプルダウンの選択肢にする
+      }
+    });
+
+    return validLines;
   }
 
   // 💡 経由地を追加する（出発地と目的地の間に挟み込む）
@@ -264,8 +282,9 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
 
   // --- ➔ UIコンポーネント: 路線ノード ---
   Widget _buildLineNode({required int index}) {
-    String previousStation = _stationControllers[index].text;
-    List<String> availableLines = _getAvailableLines(previousStation);
+    // String previousStation = _stationControllers[index].text;
+    // List<String> availableLines = _getAvailableLines(previousStation);
+    List<String> availableLines = _getAvailableLines(index);
 
     if (!availableLines.contains(_selectedLines[index])) {
       _selectedLines[index] = null;
