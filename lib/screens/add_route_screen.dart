@@ -149,14 +149,6 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
-      // appBar: AppBar(
-      //   title: const Text(
-      //     'ルートの作成',
-      //     style: TextStyle(fontWeight: FontWeight.bold),
-      //   ),
-      //   backgroundColor: Colors.transparent,
-      //   elevation: 0,
-      // ),
       appBar: AppBar(
         title: Text(
           widget.editingRoute != null
@@ -305,14 +297,92 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         ),
         const SizedBox(width: 16),
 
-        // 中央: 駅名入力
+        // 普通のTextFieldをAutocomplete（予測サジェスト付き）に拡張！
         Expanded(
           flex: 4,
-          child: _buildInputField(
-            _stationControllers[index],
-            label,
-            "駅名を入力",
-            onChanged: (_) => setState(() {}),
+          child: Autocomplete<String>(
+            // ① 入力された文字に応じて、route_masterのキー（全駅名）から候補を絞り込む処理
+            optionsBuilder: (TextEditingValue textEditingValue) {
+              if (textEditingValue.text.isEmpty) {
+                return const Iterable<String>.empty();
+              }
+              // 入力した文字が含まれている駅名を route_master から探す
+              return widget.routeMaster.keys.where((String option) {
+                return option.contains(textEditingValue.text);
+              });
+            },
+            // ② 候補リストから駅がタップされた（選択された）ときの処理
+            onSelected: (String selection) {
+              _stationControllers[index].text = selection;
+              setState(() {}); // 路線選択のドロップダウンを再計算させる
+            },
+            // ③ 実際に入力フォーム（見た目）をビルドする処理
+            fieldViewBuilder:
+                (context, textController, focusNode, onFieldSubmitted) {
+                  // 💡 【超重要】画面を開いたときやコントローラーの値が書き換わったときに同期させる
+                  if (textController.text != _stationControllers[index].text) {
+                    textController.text = _stationControllers[index].text;
+                  }
+                  // 💡 入力中の文字を元のコントローラーにも常に同期。これで「大船」などの自由入力も100%通る！
+                  textController.addListener(() {
+                    _stationControllers[index].text = textController.text;
+                  });
+
+                  return TextFormField(
+                    controller: textController,
+                    focusNode: focusNode,
+                    style: const TextStyle(fontSize: 14),
+                    onChanged: (_) =>
+                        setState(() {}), // 入力ごとに路線ドロップダウン候補をリアルタイム更新
+                    decoration: InputDecoration(
+                      labelText: label,
+                      hintText: "駅名を入力",
+                      filled: true,
+                      fillColor: const Color(0xFF121214),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    validator: (value) =>
+                        (value == null || value.isEmpty) ? '必須' : null,
+                  );
+                },
+            // ④ ポコッと下に浮き出てくる「候補リスト」の見た目をデザインする処理
+            optionsViewBuilder: (context, onSelected, options) {
+              return Align(
+                alignment: Alignment.topLeft,
+                child: Material(
+                  elevation: 4.0,
+                  color: const Color(0xFF1E1E24), // アプリのダークテーマに合わせた背景色
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    width: 220, // 画面を圧迫しないスリムな横幅
+                    constraints: const BoxConstraints(
+                      maxHeight: 200, // 👈 💡 これで綺麗に最大200pxに制限されます！
+                    ),
+                    child: ListView.builder(
+                      padding: EdgeInsets.zero,
+                      shrinkWrap: true,
+                      itemCount: options.length,
+                      itemBuilder: (BuildContext context, int index) {
+                        final String option = options.elementAt(index);
+                        return ListTile(
+                          title: Text(
+                            option,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                          onTap: () => onSelected(option), // タップで確定
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
 
