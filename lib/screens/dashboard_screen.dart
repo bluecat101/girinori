@@ -39,6 +39,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   ];
 
   final Map<String, TimeOfDay> _routeBaseTimes = {};
+  // どのルートのどの区間が何本シフトしているかを保存するマップ
+  // Key: "ルートID_区間インデックス" (例: "route_1_0")、 Value: シフト数 (-1や2など)
+  final Map<String, int> _segmentShiftCounts = {};
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
   @override
@@ -141,12 +144,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return "weekday";
   }
 
+  // シフト数（N本前/後）を考慮して、出発と到着の時刻をJSONからペアで引くロジック
   (TimeOfDay, TimeOfDay) _findNextTrainTimes({
     required String lineId,
     required String departureStation,
     required String arrivalStation,
     required TimeOfDay baseTime,
-    bool isPrevious = false,
+    int shiftCount = 0, // 💡 何本シフトするかを受け取る
   }) {
     final jsonTrips = _cachedTimetables[lineId];
     if (jsonTrips == null) return (baseTime, baseTime);
@@ -157,13 +161,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<Map<String, dynamic>> validTrips = [];
     List<int> depMinutesList = [];
 
+    // 1. 今日走っている＆該当する駅に止まる列車をすべて抽出
     for (var trip in jsonTrips) {
       if (trip['day_type'] != dayType) continue;
-
       final stopTimes = trip['stop_times'] as Map<String, dynamic>;
       final depTiming = stopTimes[departureStation];
       final arrTiming = stopTimes[arrivalStation];
-
       if (depTiming == null || arrTiming == null) continue;
 
       int? depMin = depTiming['dep'] ?? depTiming['arr'];
@@ -175,36 +178,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     if (depMinutesList.isEmpty) return (baseTime, baseTime);
 
-    int targetIndex = 0;
-    if (isPrevious) {
-      int maxPrev = -1;
-      for (int i = 0; i < depMinutesList.length; i++) {
-        if (depMinutesList[i] < baseMinutes && depMinutesList[i] > maxPrev) {
-          maxPrev = depMinutesList[i];
-          targetIndex = i;
-        }
-      }
-      if (maxPrev == -1) return (baseTime, baseTime);
-    } else {
-      int minNext = 9999;
-      for (int i = 0; i < depMinutesList.length; i++) {
-        if (depMinutesList[i] >= baseMinutes && depMinutesList[i] < minNext) {
-          minNext = depMinutesList[i];
-          targetIndex = i;
-        }
-      }
-      if (minNext == 9999) {
-        int minStart = 9999;
-        for (int i = 0; i < depMinutesList.length; i++) {
-          if (depMinutesList[i] < minStart) {
-            minStart = depMinutesList[i];
-            targetIndex = i;
-          }
-        }
+    // 2. 出発時間順に並び替えるためのインデックス配列を作成
+    List<int> sortedIndices = List.generate(depMinutesList.length, (i) => i);
+    sortedIndices.sort(
+      (a, b) => depMinutesList[a].compareTo(depMinutesList[b]),
+    );
+
+    // 3. 基準時刻（現在時刻など）以降で、一番近い列車のインデックスを探す
+    int baseIndexInSorted = 0;
+    bool found = false;
+    for (int i = 0; i < sortedIndices.length; i++) {
+      if (depMinutesList[sortedIndices[i]] >= baseMinutes) {
+        baseIndexInSorted = i;
+        found = true;
+        break;
       }
     }
+    if (!found) baseIndexInSorted = 0; // なければ始発
 
-    final targetTrip = validTrips[targetIndex];
+    // 4. ベース位置に「ボタンを押した回数（シフト数）」を加算して、ターゲット列車を決定
+    int targetIndexInSorted = baseIndexInSorted + shiftCount;
+
+    // 配列の範囲外（終電以降や始発以前）にならないように丸める安全弁
+    if (targetIndexInSorted < 0) targetIndexInSorted = 0;
+    if (targetIndexInSorted >= sortedIndices.length)
+      targetIndexInSorted = sortedIndices.length - 1;
+
+    // 5. ターゲット列車の正確な出発・到着時刻を抽出
+    final targetTrip = validTrips[sortedIndices[targetIndexInSorted]];
     final targetStopTimes = targetTrip['stop_times'] as Map<String, dynamic>;
 
     int finalDepMin =
@@ -229,25 +230,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
   }
 
-  void _shiftRouteTime(
-    String routeId,
-    TransitSegment segment, {
-    required bool isNext,
-  }) {
+  // 矢印ボタンが押されたとき、シフト数を±1する新しいメソッド
+  void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
     setState(() {
-      final currentTime = _routeBaseTimes[routeId] ?? TimeOfDay.now();
+      final key = "${routeId}_$segmentIndex";
+      final currentShift = _segmentShiftCounts[key] ?? 0;
 
-      // 💡 修正：新設した _findNextTrainTimes を使い、(出発, 到着) のうち [出発（$1）] だけを時間送りに利用する
-      final times = _findNextTrainTimes(
-        lineId: segment.line,
-        departureStation: segment.departureStation,
-        arrivalStation: segment.arrivalStation, // 👈 追加
-        baseTime: isNext ? _addMinutes(currentTime, 1) : currentTime,
-        isPrevious: !isNext,
-      );
-
-      // Dartのタプルから1個目（出発時刻）を取り出すときは . $1 と書きます
-      _routeBaseTimes[routeId] = times.$1;
+      // 次へなら+1、前へなら-1
+      _segmentShiftCounts[key] = isNext ? currentShift + 1 : currentShift - 1;
     });
   }
 
@@ -354,13 +344,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     for (int i = 0; i < route.segments.length; i++) {
       final seg = route.segments[i];
+      // この区間のシフト数のキーを作成して取得する
+      final shiftKey = "${route.id}_$i";
+      final currentShift = _segmentShiftCounts[shiftKey] ?? 0;
 
-      // 💡 修正：出発駅と到着駅を両方渡して、JSONから本物の時刻をペアで抜く！
       final (dep, arr) = _findNextTrainTimes(
         lineId: seg.line,
         departureStation: seg.departureStation,
-        arrivalStation: seg.arrivalStation, // 👈 目的地の駅名
+        arrivalStation: seg.arrivalStation, // 👈 追加
         baseTime: runningTime,
+        shiftCount: currentShift, // 👈 追加
       );
 
       departureTimes.add(dep);
@@ -408,6 +401,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     for (int i = 0; i < route.segments.length; i++) ...[
                       _buildStationRow(
                         routeId: route.id,
+                        segmentIndex: i, // 👈 これを追加！
                         stationName: route.segments[i].departureStation,
                         arrivalTime: i == 0 ? null : arrivalTimes[i - 1],
                         departureTime: departureTimes[i],
@@ -419,6 +413,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ],
                     _buildStationRow(
                       routeId: route.id,
+                      segmentIndex: route.segments.length,
                       stationName: route.segments.last.arrivalStation,
                       arrivalTime: arrivalTimes.last,
                       departureTime: null,
@@ -436,9 +431,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // --- 🚉 縦並び駅要素（「着 ➔ 駅名 ➔ 発」の3段レイアウト） ---
   Widget _buildStationRow({
     required String routeId,
+    required int segmentIndex, // 👈 1. 引数に segmentIndex を追加
     required String stationName,
     required TimeOfDay? arrivalTime,
     required TimeOfDay? departureTime,
@@ -449,6 +444,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Color nodeColor = isStart
         ? const Color(0xFF00E676)
         : (isEnd ? Colors.redAccent : const Color(0xFF00B0FF));
+
+    // 💡 2. 【ここを追加】現在のボタンの押し込み数（シフト数）を数えて、ラベル文字を作る
+    String shiftLabel = "";
+    if (!isEnd) {
+      final shiftKey = "${routeId}_$segmentIndex";
+      // ※まだ _segmentShiftCounts は定義していないので、一時的に 0 固定に型合わせしておきます。
+      // あとで状態変数を追加したらここが連動します。
+      int count = _segmentShiftCounts[shiftKey] ?? 0;
+      if (count > 0) shiftLabel = " [$count本後]";
+      if (count < 0) shiftLabel = " [${count.abs()}本前]";
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -488,15 +494,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
               const SizedBox(height: 1),
               if (departureTime != null)
-                Text(
-                  "${_formatTime(departureTime)}発",
-                  style: TextStyle(
-                    color: isStart
-                        ? const Color(0xFF00E676)
-                        : const Color(0xFF00B0FF),
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
-                  ),
+                // 💡 3. 【ここを修正】Rowで包んで、発車時刻の右隣にラベルを追加
+                Row(
+                  children: [
+                    Text(
+                      "${_formatTime(departureTime)}発",
+                      style: TextStyle(
+                        color: isStart
+                            ? const Color(0xFF00E676)
+                            : const Color(0xFF00B0FF),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (shiftLabel.isNotEmpty) // 👈 これを追加
+                      Text(
+                        shiftLabel,
+                        style: const TextStyle(
+                          color: Colors.orangeAccent,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 ),
             ],
           ),
@@ -513,8 +533,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                onPressed: () =>
-                    _shiftRouteTime(routeId, segment, isNext: false),
+                // ⭕ 修正後：1本前に戻す
+                onPressed: () => _shiftTrainCount(routeId, segmentIndex, false),
               ),
               IconButton(
                 icon: const Icon(
@@ -524,8 +544,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                onPressed: () =>
-                    _shiftRouteTime(routeId, segment, isNext: true),
+                // ⭕ 修正後：1本後に進める
+                onPressed: () => _shiftTrainCount(routeId, segmentIndex, true),
               ),
             ],
           ),
