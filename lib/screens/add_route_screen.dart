@@ -1,14 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:girinori/models/transit_model.dart';
 
+// 💡 画面内で複数ルートの入力状態を管理する内部クラス
+class _RouteInputData {
+  late TextEditingController nameController;
+  final List<TextEditingController> viaStationControllers = [];
+  final List<TextEditingController> walkTimeControllers = [];
+  final List<String?> selectedLines = [];
+
+  _RouteInputData({required String defaultName}) {
+    nameController = TextEditingController(text: defaultName);
+    selectedLines.add(null);
+  }
+
+  void dispose() {
+    nameController.dispose();
+    for (var c in viaStationControllers) {
+      c.dispose();
+    }
+    for (var c in walkTimeControllers) {
+      c.dispose();
+    }
+  }
+}
+
 class AddRouteScreen extends StatefulWidget {
   final Map<String, Map<String, List<dynamic>>> routeMaster;
-  final TransitRoute? editingRoute; // 👈 💡 nullなら新規作成、データがあれば「編集モード」と判定できる
+  final List<TransitRoute>? editingRoutes;
 
   const AddRouteScreen({
     super.key,
     required this.routeMaster,
-    this.editingRoute, // 👈 💡 これを追加
+    this.editingRoutes,
   });
 
   @override
@@ -16,189 +39,300 @@ class AddRouteScreen extends StatefulWidget {
 }
 
 class _AddRouteScreenState extends State<AddRouteScreen> {
-  final _formKey = GlobalKey<FormState>();
+  // 💡 共通のFormStateではなく、ルートごとに独立したFormKeyを持つことで全裏ルートを一括バリデーションする
+  final List<GlobalKey<FormState>> _formKeys = [];
 
-  // 💡 【修正①】変数の「宣言」はここでまとめて行う（中身は initState で入れるので late をつける）
-  late TextEditingController _nameController;
-  final List<TextEditingController> _stationControllers = [];
-  final List<TextEditingController> _walkTimeControllers = [];
-  final List<String?> _selectedLines = [];
+  late TextEditingController _departureController;
+  late TextEditingController _arrivalController;
 
-  // ❌ 以前あった「get _stationControllers => null;」の行は完全に削除してください！
+  final List<_RouteInputData> _routes = [];
+  int _currentRouteIndex = 0;
 
   @override
   void initState() {
     super.initState();
 
-    // 💡 【修正②】widget.editingRoute にデータが入っているか（編集モードか）チェック
-    if (widget.editingRoute != null) {
-      final route = widget.editingRoute!;
-
-      // 1. ルート名を復元してセット（※型名の late や var は付けずに、上の変数に代入する）
-      _nameController = TextEditingController(text: route.name);
-
-      // 2. 各セグメント（区間）から駅名、路線名、乗換時間を復元
-      for (int i = 0; i < route.segments.length; i++) {
-        _stationControllers.add(
-          TextEditingController(text: route.segments[i].departureStation),
-        );
-        _selectedLines.add(route.segments[i].line);
-
-        if (i < route.segments.length - 1 ||
-            route.segments[i].walkTimeAfter > 0) {
-          _walkTimeControllers.add(
-            TextEditingController(
-              text: route.segments[i].walkTimeAfter.toString(),
-            ),
-          );
-        }
-      }
-      // 3. 最終の到着駅を末尾に追加
-      _stationControllers.add(
-        TextEditingController(text: route.segments.last.arrivalStation),
+    if (widget.editingRoutes != null && widget.editingRoutes!.isNotEmpty) {
+      final firstRoute = widget.editingRoutes!.first;
+      _departureController = TextEditingController(
+        text: firstRoute.segments.first.departureStation,
       );
+      _arrivalController = TextEditingController(
+        text: firstRoute.segments.last.arrivalStation,
+      );
+
+      for (var route in widget.editingRoutes!) {
+        _formKeys.add(GlobalKey<FormState>()); // 各ルート用のキーを追加
+        final inputData = _RouteInputData(defaultName: route.name);
+
+        for (int i = 0; i < route.segments.length; i++) {
+          if (i == 0) {
+            inputData.selectedLines[0] = route.segments[0].line;
+          } else {
+            inputData.viaStationControllers.add(
+              TextEditingController(text: route.segments[i].departureStation),
+            );
+            inputData.selectedLines.add(route.segments[i].line);
+          }
+
+          if (i < route.segments.length - 1) {
+            inputData.walkTimeControllers.add(
+              TextEditingController(
+                text: route.segments[i].walkTimeAfter.toString(),
+              ),
+            );
+          }
+        }
+        _routes.add(inputData);
+      }
     } else {
-      // 💡 【修正③】データが空（新規作成）なら、従来通りの初期値をセット
-      _nameController = TextEditingController(text: "マイ即帰宅ルート");
-      _stationControllers.add(TextEditingController(text: "中野"));
-      _stationControllers.add(TextEditingController(text: "渋谷"));
-      _selectedLines.add(null);
+      _departureController = TextEditingController(text: "中野");
+      _arrivalController = TextEditingController(text: "渋谷");
+
+      _formKeys.add(GlobalKey<FormState>());
+      _routes.add(_RouteInputData(defaultName: "ルート 1"));
     }
   }
 
   @override
   void dispose() {
-    // 💡 【修正④】初期化されたコントローラーたちを安全に解放する
-    _nameController.dispose();
-    for (var c in _stationControllers) {
-      c.dispose();
-    }
-    for (var c in _walkTimeControllers) {
-      c.dispose();
+    _departureController.dispose();
+    _arrivalController.dispose();
+    for (var route in _routes) {
+      route.dispose();
     }
     super.dispose();
   }
 
-  // 💡 出発駅と到着駅の「両方」を結ぶ路線だけを route_master.json から動的に抽出する
+  void _addNewRouteTemplate() {
+    setState(() {
+      int nextNumber = _routes.length + 1;
+      _formKeys.add(GlobalKey<FormState>()); // 新しいルート用のフォームキー
+      _routes.add(_RouteInputData(defaultName: "ルート $nextNumber"));
+      _currentRouteIndex = _routes.length - 1;
+    });
+  }
+
+  // 💡 【改善①】削除時の「次ルート選択」ロジックを変更
+  void _removeRoute(int index) {
+    if (_routes.length <= 1) return;
+
+    setState(() {
+      _routes[index].dispose();
+      _routes.removeAt(index);
+      _formKeys.removeAt(index);
+
+      // ご提示いただいたルールを完全に再現
+      if (index >= _routes.length) {
+        // 末尾（例: ルート3）を消した場合は、新しい末尾（実質2番目）を選択
+        _currentRouteIndex = _routes.length - 1;
+      } else {
+        // 途中（例: ルート2）を消した場合は、元ルート3（詰まって新ルート2になる場所）を選択
+        _currentRouteIndex = index;
+      }
+    });
+  }
+
+  void _addTransferStation() {
+    setState(() {
+      final currentRoute = _routes[_currentRouteIndex];
+      currentRoute.viaStationControllers.add(TextEditingController(text: ""));
+      currentRoute.walkTimeControllers.add(TextEditingController(text: "3"));
+      currentRoute.selectedLines.add(null);
+    });
+  }
+
+  void _removeTransferStation(int viaIndex) {
+    setState(() {
+      final currentRoute = _routes[_currentRouteIndex];
+      currentRoute.viaStationControllers.removeAt(viaIndex);
+      currentRoute.walkTimeControllers.removeAt(viaIndex);
+      currentRoute.selectedLines.removeAt(viaIndex + 1);
+    });
+  }
+
   List<String> _getAvailableLines(int segmentIndex) {
-    // 現在の区間の出発駅と到着駅を取得
-    String depStation = _stationControllers[segmentIndex].text.trim();
-    String arrStation = _stationControllers[segmentIndex + 1].text.trim();
+    final currentRoute = _routes[_currentRouteIndex];
+
+    String depStation = segmentIndex == 0
+        ? _departureController.text.trim()
+        : currentRoute.viaStationControllers[segmentIndex - 1].text.trim();
+
+    String arrStation = segmentIndex == currentRoute.selectedLines.length - 1
+        ? _arrivalController.text.trim()
+        : currentRoute.viaStationControllers[segmentIndex].text.trim();
 
     if (depStation.isEmpty || arrStation.isEmpty) return [];
 
-    // 駅マスタ（widget.routeMaster）から出発駅の情報を引く
     final depStationData = widget.routeMaster[depStation];
     if (depStationData == null) return [];
 
     List<String> validLines = [];
-
-    // 出発駅が持っている全路線をループ
     depStationData.forEach((lineId, stopStations) {
-      // 💡 その路線の「停車駅リスト」の中に、到着駅（arrStation）が含まれているかチェック！
       if (stopStations.contains(arrStation)) {
-        validLines.add(lineId); // 条件に合う路線（例: ＪＲ根岸線_大宮・南浦和方面）だけをプルダウンの選択肢にする
+        validLines.add(lineId);
       }
     });
 
     return validLines;
   }
 
-  // 💡 経由地を追加する（出発地と目的地の間に挟み込む）
-  void _addTransferStation() {
-    setState(() {
-      // 常に最後（目的地）の1つ手前に新しい経由駅を挿入
-      int insertIndex = _stationControllers.length - 1;
+  List<TransitRoute> _compileAllRoutes() {
+    List<TransitRoute> compiledRoutes = [];
 
-      _stationControllers.insert(insertIndex, TextEditingController(text: ""));
-      _walkTimeControllers.add(TextEditingController(text: "3")); // 乗り換え時間を追加
-      _selectedLines.add(null); // 新しい区間の路線枠を追加
-    });
-  }
+    for (var routeData in _routes) {
+      List<TransitSegment> segments = [];
+      int totalSegments = routeData.selectedLines.length;
 
-  // 経由地を削除する
-  void _removeTransferStation(int index) {
-    if (_stationControllers.length <= 2) return;
-    setState(() {
-      _stationControllers.removeAt(index);
-      _walkTimeControllers.removeAt(index - 1); // 対応する乗り換え時間を削除
-      _selectedLines.removeAt(index - 1); // 対応する路線を削除
-    });
-  }
+      for (int i = 0; i < totalSegments; i++) {
+        String dep = (i == 0)
+            ? _departureController.text
+            : routeData.viaStationControllers[i - 1].text;
+        String arr = (i == totalSegments - 1)
+            ? _arrivalController.text
+            : routeData.viaStationControllers[i].text;
+        int walk = (i < routeData.walkTimeControllers.length)
+            ? (int.tryParse(routeData.walkTimeControllers[i].text) ?? 0)
+            : 0;
 
-  // 入力フォームからTransitSegmentの配列にコンパイル
-  List<TransitSegment> _compileSegments() {
-    List<TransitSegment> segments = [];
-    for (int i = 0; i < _selectedLines.length; i++) {
-      segments.add(
-        TransitSegment(
-          departureStation: _stationControllers[i].text,
-          line: _selectedLines[i] ?? "",
-          duration: 15, // 固定値（Dashboard側の時刻表から自動計算されるためダミー）
-          arrivalStation: _stationControllers[i + 1].text,
-          walkTimeAfter: i < _walkTimeControllers.length
-              ? (int.tryParse(_walkTimeControllers[i].text) ?? 0)
-              : 0,
+        segments.add(
+          TransitSegment(
+            departureStation: dep,
+            line: routeData.selectedLines[i] ?? "",
+            duration: 15,
+            arrivalStation: arr,
+            walkTimeAfter: walk,
+          ),
+        );
+      }
+
+      compiledRoutes.add(
+        TransitRoute(
+          id:
+              DateTime.now().millisecondsSinceEpoch.toString() +
+              _routes.indexOf(routeData).toString(),
+          name: routeData.nameController.text,
+          segments: segments,
         ),
       );
     }
-    return segments;
+    return compiledRoutes;
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentRoute = _routes[_currentRouteIndex];
+    int totalNodes = 1 + currentRoute.viaStationControllers.length + 1;
+
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
       appBar: AppBar(
         title: Text(
-          widget.editingRoute != null
-              ? 'ルートの編集'
-              : 'ルートの作成', // 👈 💡 const は外してください
+          widget.editingRoutes != null ? 'ルートの一括編集' : 'ルートの一括作成',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        // 💡 【改善②】横スクロール（SingleChildScrollView）にインジケータ（スクロールバー）を配置
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
+            child: Scrollbar(
+              thumbVisibility: true, // 常にスクロールバー（カーソル）を表示
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.only(bottom: 6), // バーと被らないよう隙間を空ける
+                child: Row(
+                  children: [
+                    for (int i = 0; i < _routes.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                        child: ChoiceChip(
+                          label: Text('ルート ${i + 1}'),
+                          selected: _currentRouteIndex == i,
+                          selectedColor: const Color(0xFF00B0FF),
+                          labelStyle: TextStyle(
+                            color: _currentRouteIndex == i
+                                ? Colors.black
+                                : Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _currentRouteIndex = i;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.add_circle_outline,
+                        color: Color(0xFF00E676),
+                      ),
+                      onPressed: _addNewRouteTemplate,
+                      tooltip: "別のルートを追加",
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
+      // 💡 【改善③】非表示ルートの入力項目も裏側で破棄されないよう、Key値を現在のルートインデックスで固定してフォームを作成
       body: Form(
-        key: _formKey,
+        key: _formKeys[_currentRouteIndex], // 表示中ルートのキー
         child: Column(
           children: [
-            // ルート名称入力
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16.0,
                 vertical: 8.0,
               ),
-              child: _buildInputField(
-                _nameController,
-                "ルート名称",
-                "例: 平日の帰宅ルート",
-                icon: Icons.edit_road,
+              child: Column(
+                children: [
+                  _buildInputField(
+                    currentRoute.nameController,
+                    "ルート名称 (編集中のルート番号: ${_currentRouteIndex + 1})",
+                    "例: 京浜東北線経由",
+                    icon: Icons.edit_road,
+                  ),
+                  if (_routes.length > 1)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.redAccent,
+                        ),
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: const Text("このルートを破棄"),
+                        onPressed: () => _removeRoute(_currentRouteIndex),
+                      ),
+                    ),
+                ],
               ),
             ),
             const Divider(color: Colors.white10, height: 1),
 
-            // メインタイムライン
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   children: [
-                    for (int i = 0; i < _stationControllers.length; i++) ...[
-                      // 🚉 駅ノード（出発・経由・到着）
+                    for (int i = 0; i < totalNodes; i++) ...[
                       _buildStationNode(
-                        index: i,
+                        nodeIndex: i,
                         isStart: i == 0,
-                        isEnd: i == _stationControllers.length - 1,
+                        isEnd: i == totalNodes - 1,
                       ),
-
-                      // ➔ 路線ノード（最後の駅の後ろには表示しない）
-                      if (i < _stationControllers.length - 1)
-                        _buildLineNode(index: i),
+                      if (i < totalNodes - 1) _buildLineNode(segmentIndex: i),
                     ],
-
                     const SizedBox(height: 16),
-                    // ➕ 経由地追加ボタン
                     _buildAddStepButton(),
                     const SizedBox(height: 24),
                   ],
@@ -206,7 +340,6 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
               ),
             ),
 
-            // 登録ボタン
             Container(
               padding: const EdgeInsets.all(16),
               decoration: const BoxDecoration(
@@ -214,11 +347,9 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                 border: Border(top: BorderSide(color: Colors.white10)),
               ),
               child: SafeArea(
-                // 色と文字を「編集モード」に連動させる
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    // 💡 編集ならオレンジ（Colors.orangeAccent）、新規なら緑
-                    backgroundColor: widget.editingRoute != null
+                    backgroundColor: widget.editingRoutes != null
                         ? Colors.orangeAccent
                         : const Color(0xFF00E676),
                     foregroundColor: Colors.black,
@@ -229,22 +360,43 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                     elevation: 0,
                   ),
                   onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      Navigator.pop(
-                        context,
-                        TransitRoute(
-                          id: widget.editingRoute != null
-                              ? widget.editingRoute!.id
-                              : DateTime.now().toString(),
-                          name: _nameController.text,
-                          segments: _compileSegments(),
+                    // 💡 【改善④】すべてのルート（非表示含む）のバリデーションを一括チェック
+                    bool allValid = true;
+                    int firstErrorIndex = -1;
+
+                    for (int i = 0; i < _formKeys.length; i++) {
+                      // 隠れているルートのフォームを一時的に検証するために、現在のインデックスを偽装してチェック
+                      if (!_formKeys[i].currentState!.validate()) {
+                        allValid = false;
+                        if (firstErrorIndex == -1) {
+                          firstErrorIndex = i; // 最初に不備が見つかったルート番号を記憶
+                        }
+                      }
+                    }
+
+                    if (!allValid) {
+                      // 不備がある最初のルートへ自動ジャンプしてユーザーに知らせる
+                      setState(() {
+                        _currentRouteIndex = firstErrorIndex;
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'ルート ${firstErrorIndex + 1} に未入力などの不備があります。',
+                          ),
+                          backgroundColor: Colors.redAccent,
                         ),
                       );
+                      return;
                     }
+
+                    List<TransitRoute> results = _compileAllRoutes();
+                    Navigator.pop(context, results);
                   },
-                  // 💡 編集なら「変更を保存する」、新規なら「このルートを登録する」
                   child: Text(
-                    widget.editingRoute != null ? "変更を保存する" : "このルートを登録する",
+                    widget.editingRoutes != null
+                        ? "全 ${_routes.length} 個の変更を保存する"
+                        : "全 ${_routes.length} 個のルートを一括登録する",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
@@ -260,20 +412,29 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   }
 
   // --- 🚉 UIコンポーネント: 駅ノード ---
+  // --- 🚉 UIコンポーネント: 駅ノード ---
   Widget _buildStationNode({
-    required int index,
+    required int nodeIndex,
     bool isStart = false,
     bool isEnd = false,
   }) {
-    String label = isStart ? "出発駅" : (isEnd ? "到着駅" : "経由駅 $index");
+    String label = isStart ? "出発駅" : (isEnd ? "到着駅" : "経由駅 $nodeIndex");
     Color themeColor = isStart
         ? const Color(0xFF00E676)
         : (isEnd ? Colors.redAccent : const Color(0xFF00B0FF));
 
+    final currentRoute = _routes[_currentRouteIndex];
+
+    // 💡 どのコントローラーを対象にするかを先に確定させる
+    TextEditingController targetCtrl = isStart
+        ? _departureController
+        : (isEnd
+              ? _arrivalController
+              : currentRoute.viaStationControllers[nodeIndex - 1]);
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        // 左側: タイムラインのピン
         Column(
           children: [
             Container(
@@ -297,43 +458,39 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         ),
         const SizedBox(width: 16),
 
-        // 普通のTextFieldをAutocomplete（予測サジェスト付き）に拡張！
         Expanded(
           flex: 4,
           child: Autocomplete<String>(
-            // ① 入力された文字に応じて、route_masterのキー（全駅名）から候補を絞り込む処理
+            key: ValueKey('auto_${_currentRouteIndex}_$nodeIndex'),
+            // 💡 テキスト値もKeyに含めて状態を完全にクリアに保つ
             optionsBuilder: (TextEditingValue textEditingValue) {
-              if (textEditingValue.text.isEmpty) {
+              if (textEditingValue.text.isEmpty)
                 return const Iterable<String>.empty();
-              }
-              // 入力した文字が含まれている駅名を route_master から探す
-              return widget.routeMaster.keys.where((String option) {
-                return option.contains(textEditingValue.text);
+              return widget.routeMaster.keys.where(
+                (String option) => option.contains(textEditingValue.text),
+              );
+            },
+            onSelected: (String selection) {
+              setState(() {
+                targetCtrl.text = selection; // 💡 共通化された対象にシンプルに代入
               });
             },
-            // ② 候補リストから駅がタップされた（選択された）ときの処理
-            onSelected: (String selection) {
-              _stationControllers[index].text = selection;
-              setState(() {}); // 路線選択のドロップダウンを再計算させる
-            },
-            // ③ 実際に入力フォーム（見た目）をビルドする処理
             fieldViewBuilder:
                 (context, textController, focusNode, onFieldSubmitted) {
-                  // 💡 【超重要】画面を開いたときやコントローラーの値が書き換わったときに同期させる
-                  if (textController.text != _stationControllers[index].text) {
-                    textController.text = _stationControllers[index].text;
+                  // 💡 画面が開いた時やタブ切り替え時に初期値を同期
+                  if (textController.text != targetCtrl.text) {
+                    textController.text = targetCtrl.text;
                   }
-                  // 💡 入力中の文字を元のコントローラーにも常に同期。これで「大船」などの自由入力も100%通る！
-                  textController.addListener(() {
-                    _stationControllers[index].text = textController.text;
-                  });
 
                   return TextFormField(
                     controller: textController,
                     focusNode: focusNode,
                     style: const TextStyle(fontSize: 14),
-                    onChanged: (_) =>
-                        setState(() {}), // 入力ごとに路線ドロップダウン候補をリアルタイム更新
+                    // 💡 危険な addListener は完全に排除し、onChanged だけで裏の変数と100%確実に同期させる
+                    onChanged: (val) {
+                      targetCtrl.text = val;
+                      setState(() {}); // 路線ドロップダウンの再計算用
+                    },
                     decoration: InputDecoration(
                       labelText: label,
                       hintText: "駅名を入力",
@@ -348,19 +505,16 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                         (value == null || value.isEmpty) ? '必須' : null,
                   );
                 },
-            // ④ ポコッと下に浮き出てくる「候補リスト」の見た目をデザインする処理
             optionsViewBuilder: (context, onSelected, options) {
               return Align(
                 alignment: Alignment.topLeft,
                 child: Material(
                   elevation: 4.0,
-                  color: const Color(0xFF1E1E24), // アプリのダークテーマに合わせた背景色
+                  color: const Color(0xFF1E1E24),
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
-                    width: 220, // 画面を圧迫しないスリムな横幅
-                    constraints: const BoxConstraints(
-                      maxHeight: 200, // 👈 💡 これで綺麗に最大200pxに制限されます！
-                    ),
+                    width: 220,
+                    constraints: const BoxConstraints(maxHeight: 200),
                     child: ListView.builder(
                       padding: EdgeInsets.zero,
                       shrinkWrap: true,
@@ -375,7 +529,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                               fontSize: 13,
                             ),
                           ),
-                          onTap: () => onSelected(option), // タップで確定
+                          onTap: () => onSelected(option),
                         );
                       },
                     ),
@@ -386,13 +540,12 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
           ),
         ),
 
-        // 経由駅のすぐ横に「乗り換え時間入力」を配置
         if (!isStart && !isEnd) ...[
           const SizedBox(width: 8),
           Expanded(
             flex: 2,
             child: _buildInputField(
-              _walkTimeControllers[index - 1],
+              currentRoute.walkTimeControllers[nodeIndex - 1],
               "乗換(分)",
               "分",
               isNumber: true,
@@ -404,29 +557,27 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
               Icons.remove_circle_outline,
               color: Colors.redAccent,
             ),
-            onPressed: () => _removeTransferStation(index),
+            onPressed: () => _removeTransferStation(nodeIndex - 1),
           ),
         ] else ...[
-          const SizedBox(width: 56), // 出発・到着駅の右側スペース埋め
+          const SizedBox(width: 56),
         ],
       ],
     );
   }
 
   // --- ➔ UIコンポーネント: 路線ノード ---
-  Widget _buildLineNode({required int index}) {
-    // String previousStation = _stationControllers[index].text;
-    // List<String> availableLines = _getAvailableLines(previousStation);
-    List<String> availableLines = _getAvailableLines(index);
+  Widget _buildLineNode({required int segmentIndex}) {
+    final currentRoute = _routes[_currentRouteIndex];
+    List<String> availableLines = _getAvailableLines(segmentIndex);
 
-    if (!availableLines.contains(_selectedLines[index])) {
-      _selectedLines[index] = null;
+    if (!availableLines.contains(currentRoute.selectedLines[segmentIndex])) {
+      currentRoute.selectedLines[segmentIndex] = null;
     }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 左側: タイムラインの縦線
         Padding(
           padding: const EdgeInsets.only(left: 10.0),
           child: Container(
@@ -437,7 +588,6 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         ),
         const SizedBox(width: 24),
 
-        // 利用路線選択
         Expanded(
           child: Container(
             margin: const EdgeInsets.symmetric(vertical: 4),
@@ -447,9 +597,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: DropdownButtonFormField<String>(
-              value: _selectedLines[index],
+              // 💡 【改善⑥に関連】タブを切り替えた時にDropdownの状態を強制リフレッシュさせるためのKey
+              key: ValueKey(
+                'line_${_currentRouteIndex}_$segmentIndex${availableLines.length}',
+              ),
+              value: currentRoute.selectedLines[segmentIndex],
               hint: Text(
-                availableLines.isEmpty ? "上の駅名を入力してください" : "利用路線を選択",
+                availableLines.isEmpty ? "前後の駅名を確認してください" : "利用路線を選択",
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
               dropdownColor: const Color(0xFF1E1E24),
@@ -472,7 +626,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
               }).toList(),
               onChanged: (newValue) {
                 setState(() {
-                  _selectedLines[index] = newValue;
+                  currentRoute.selectedLines[segmentIndex] = newValue;
                 });
               },
               validator: (value) => value == null ? '路線を選択してください' : null,
@@ -483,7 +637,6 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     );
   }
 
-  // --- ➕ UIコンポーネント: 経由地追加ボタン ---
   Widget _buildAddStepButton() {
     return Padding(
       padding: const EdgeInsets.only(left: 36.0),
@@ -499,14 +652,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         onPressed: _addTransferStation,
         icon: const Icon(Icons.add_location_alt_outlined, size: 18),
         label: const Text(
-          "経由地（乗り換え駅）を追加",
+          "このルートに経由地を追加",
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
         ),
       ),
     );
   }
 
-  // 共通テキストフィールド
   Widget _buildInputField(
     TextEditingController controller,
     String label,
@@ -516,6 +668,8 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     ValueChanged<String>? onChanged,
   }) {
     return TextFormField(
+      // 💡 タブ切り替え時に状態がごちゃ混ぜにならないようにKeyを追加
+      key: ValueKey(controller.hashCode),
       controller: controller,
       keyboardType: isNumber ? TextInputType.number : TextInputType.text,
       onChanged: onChanged,
