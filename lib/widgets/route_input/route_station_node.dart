@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class RouteStationNode extends StatelessWidget {
   final int nodeIndex;
@@ -214,6 +215,23 @@ class _WalkTimeField extends StatelessWidget {
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.number,
+      // PCでも数字以外を入力させない
+      inputFormatters: [
+        TextInputFormatter.withFunction((oldValue, newValue) {
+          // 空文字は許可
+          if (newValue.text.isEmpty) {
+            return newValue;
+          }
+
+          // 0〜9だけなら許可
+          if (RegExp(r'^[0-9]+$').hasMatch(newValue.text)) {
+            return newValue;
+          }
+
+          // 数字以外が含まれたら変更を拒否
+          return oldValue;
+        }),
+      ],
       style: const TextStyle(fontSize: 13, color: Colors.white),
       decoration: InputDecoration(
         labelText: '乗換(分)',
