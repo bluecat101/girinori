@@ -21,8 +21,9 @@ class AddRouteScreen extends StatefulWidget {
 class _AddRouteScreenState extends State<AddRouteScreen> {
   // 💡 共通のFormStateではなく、ルートごとに独立したFormKeyを持つことで全裏ルートを一括バリデーションする
   // final List<GlobalKey<FormState>> _controller.formKeys = [];
-  final List<RouteInputData> _routes = [];
-  int _currentRouteIndex = 0;
+  final RouteInputData _route = RouteInputData(defaultName: 'ルート 1');
+  // final List<RouteInputData> _routes = [];
+  // int _currentRouteIndex = 0;
   late final RouteInputController _controller;
   final ScrollController _routeTabScrollController = ScrollController();
   // 💡 駅名が変更されたときに、路線選択のDropdownをリフレッシュするためのNotifier
@@ -44,15 +45,15 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     super.dispose();
   }
 
-  void _addNewRouteTemplate() {
-    setState(() {
-      _controller.addNewRouteTemplate();
-    });
-  }
+  // void _addNewRouteTemplate() {
+  //   setState(() {
+  //     _controller.addNewRouteTemplate();
+  //   });
+  // }
 
-  void _removeRoute(int index) {
+  void _removeRoute() {
     setState(() {
-      _controller.removeRoute(index);
+      _controller.removeRoute();
     });
   }
 
@@ -71,7 +72,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
       backgroundColor: const Color(0xFF121214),
       appBar: AppBar(
         title: Text(
-          widget.editingRoute != null ? 'ルートの一括編集' : 'ルートの一括作成',
+          widget.editingRoute != null ? 'ルートの編集' : 'ルートの作成',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -89,36 +90,30 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                 padding: const EdgeInsets.only(bottom: 6), // バーと被らないよう隙間を空ける
                 child: Row(
                   children: [
-                    for (int i = 0; i < _routes.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                        child: ChoiceChip(
-                          label: Text('ルート ${i + 1}'),
-                          selected: _currentRouteIndex == i,
-                          selectedColor: const Color(0xFF00B0FF),
-                          labelStyle: TextStyle(
-                            color: _currentRouteIndex == i
-                                ? Colors.black
-                                : Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              setState(() {
-                                _currentRouteIndex = i;
-                              });
-                            }
-                          },
+                    // for (int i = 0; i < _route.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                      child: Chip(
+                        label: Text(
+                          _controller.currentRoute.nameController.text.isEmpty
+                              ? 'ルート'
+                              : _controller.currentRoute.nameController.text,
+                        ),
+                        backgroundColor: const Color(0xFF00B0FF),
+                        labelStyle: const TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.add_circle_outline,
-                        color: Color(0xFF00E676),
-                      ),
-                      onPressed: _addNewRouteTemplate,
-                      tooltip: "別のルートを追加",
                     ),
+                    // IconButton(
+                    //   icon: const Icon(
+                    //     Icons.add_circle_outline,
+                    //     color: Color(0xFF00E676),
+                    //   ),
+                    //   onPressed: _addNewRouteTemplate,
+                    //   tooltip: "別のルートを追加",
+                    // ),
                     const SizedBox(width: 8),
                   ],
                 ),
@@ -129,7 +124,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
       ),
       // 💡 【改善③】非表示ルートの入力項目も裏側で破棄されないよう、Key値を現在のルートインデックスで固定してフォームを作成
       body: Form(
-        key: _controller.formKeys[_currentRouteIndex], // 表示中ルートのキー
+        key: _controller.formKey, // 表示中ルートのキー
         child: Column(
           children: [
             Padding(
@@ -141,22 +136,22 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                 children: [
                   _buildInputField(
                     currentRoute.nameController,
-                    "ルート名称 (編集中のルート番号: ${_currentRouteIndex + 1})",
+                    "ルート名称",
                     "例: 京浜東北線経由",
                     icon: Icons.edit_road,
                   ),
-                  if (_routes.length > 1)
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.redAccent,
-                        ),
-                        icon: const Icon(Icons.delete_outline, size: 16),
-                        label: const Text("このルートを破棄"),
-                        onPressed: () => _removeRoute(_currentRouteIndex),
+                  // if (_route.length > 1)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.redAccent,
                       ),
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: const Text("このルートを破棄"),
+                      onPressed: () => _removeRoute(),
                     ),
+                  ),
                 ],
               ),
             ),
@@ -240,26 +235,24 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                     bool allValid = true;
                     int firstErrorIndex = -1;
 
-                    for (int i = 0; i < _controller.formKeys.length; i++) {
-                      // 隠れているルートのフォームを一時的に検証するために、現在のインデックスを偽装してチェック
-                      if (!_controller.formKeys[i].currentState!.validate()) {
-                        allValid = false;
-                        if (firstErrorIndex == -1) {
-                          firstErrorIndex = i; // 最初に不備が見つかったルート番号を記憶
-                        }
-                      }
+                    // for (int i = 0; i < _controller.formKey.length; i++) {
+                    // 隠れているルートのフォームを一時的に検証するために、現在のインデックスを偽装してチェック
+                    if (!_controller.formKey.currentState!.validate()) {
+                      allValid = false;
+                      // if (firstErrorIndex == -1) {
+                      //   firstErrorIndex = i; // 最初に不備が見つかったルート番号を記憶
+                      // }
                     }
+                    // }
 
                     if (!allValid) {
                       // 不備がある最初のルートへ自動ジャンプしてユーザーに知らせる
-                      setState(() {
-                        _currentRouteIndex = firstErrorIndex;
-                      });
+                      // setState(() {
+                      //   _currentRouteIndex = firstErrorIndex;
+                      // });
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text(
-                            'ルート ${firstErrorIndex + 1} に未入力などの不備があります。',
-                          ),
+                          content: Text('ルートに未入力などの不備があります。'),
                           backgroundColor: Colors.redAccent,
                         ),
                       );
@@ -272,9 +265,10 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                     Navigator.pop(context, result);
                   },
                   child: Text(
-                    widget.editingRoute != null
-                        ? "全 ${_routes.length} 個の変更を保存する"
-                        : "全 ${_routes.length} 個のルートを一括登録する",
+                    //   widget.editingRoute != null
+                    //       ? "全 ${_routes.length} 個の変更を保存する"
+                    //       : "全 ${_routes.length} 個のルートを一括登録する",
+                    widget.editingRoute != null ? "変更を保存する" : "ルートを登録する",
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,

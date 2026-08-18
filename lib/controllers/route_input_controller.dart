@@ -48,8 +48,7 @@ class RouteInputController {
   // ============================================================
   // Form Keys
   // ============================================================
-  final List<GlobalKey<FormState>> formKeys = [];
-
+  late final GlobalKey<FormState> formKey;
   // ============================================================
   // 初期化
   // ============================================================
@@ -79,7 +78,7 @@ class RouteInputController {
     arrivalController = TextEditingController(
       text: route.segments.last.arrivalStation,
     );
-    formKeys.add(GlobalKey<FormState>());
+    formKey = GlobalKey<FormState>();
     final inputData = RouteInputData(defaultName: route.name);
     for (int i = 0; i < route.segments.length; i++) {
       final segment = route.segments[i];
@@ -106,7 +105,7 @@ class RouteInputController {
   void _initializeNewRoute() {
     departureController = TextEditingController(text: '横浜');
     arrivalController = TextEditingController(text: '桜木町');
-    formKeys.add(GlobalKey<FormState>());
+    formKey = GlobalKey<FormState>();
     final route = RouteInputData(defaultName: 'ルート 1');
     // 最初の区間の路線選択欄を用意する
     route.selectedLines.add(null);
@@ -116,29 +115,29 @@ class RouteInputController {
   // ============================================================
   // ルート追加
   // ============================================================
-  void addNewRouteTemplate() {
-    final nextNumber = routes.length + 1;
-    formKeys.add(GlobalKey<FormState>());
-    routes.add(RouteInputData(defaultName: 'ルート $nextNumber'));
-    currentRouteIndex = routes.length - 1;
-  }
+  // void addNewRouteTemplate() {
+  //   final nextNumber = routes.length + 1;
+  //   formKeys.add(GlobalKey<FormState>());
+  //   routes.add(RouteInputData(defaultName: 'ルート $nextNumber'));
+  //   currentRouteIndex = routes.length - 1;
+  // }
 
   // ============================================================
   // ルート削除
   // ============================================================
-  void removeRoute(int index) {
+  void removeRoute() {
     if (routes.length <= 1) {
       return;
     }
 
-    routes[index].dispose();
-    routes.removeAt(index);
-    formKeys.removeAt(index);
-    if (index >= routes.length) {
-      currentRouteIndex = routes.length - 1;
-    } else {
-      currentRouteIndex = index;
-    }
+    routes[currentRouteIndex].dispose();
+    routes.removeAt(currentRouteIndex);
+    formKey = GlobalKey<FormState>();
+    // if (currentRouteIndex >= routes.length) {
+    //   currentRouteIndex = routes.length - 1;
+    // } else {
+    //   currentRouteIndex = index;
+    // }
   }
 
   // ============================================================
