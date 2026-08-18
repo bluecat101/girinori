@@ -246,6 +246,7 @@ class RouteInputController {
   // ============================================================
 
   List<TransitRoute> compileAllRoutes() {
+    print("compileAllRoutes");
     final compiledRoutes = <TransitRoute>[];
     for (int routeIndex = 0; routeIndex < routes.length; routeIndex++) {
       final routeData = routes[routeIndex];

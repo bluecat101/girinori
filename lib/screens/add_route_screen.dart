@@ -25,6 +25,8 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   int _currentRouteIndex = 0;
   late final RouteInputController _controller;
   final ScrollController _routeTabScrollController = ScrollController();
+  // 💡 駅名が変更されたときに、路線選択のDropdownをリフレッシュするためのNotifier
+  final ValueNotifier<int> _stationChangeNotifier = ValueNotifier(0);
   @override
   void initState() {
     super.initState();
@@ -38,6 +40,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   void dispose() {
     _routeTabScrollController.dispose();
     _controller.dispose();
+    _stationChangeNotifier.dispose();
     super.dispose();
   }
 
@@ -176,6 +179,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                         stationNames: widget.routeMaster.keys,
                         onStationChanged: (value) {
                           _controller.getStationController(i).text = value;
+                          _stationChangeNotifier.value++;
                         },
                         onStationSelected: (station) {
                           _controller.getStationController(i).text = station;
@@ -190,14 +194,17 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                             : null,
                       ),
                       if (i < _controller.totalNodes - 1)
-                        RouteLineNode(
-                          segmentIndex: i,
-                          availableLines: _controller.getAvailableLines(i),
-                          selectedLine: _controller.getSelectedLine(i),
-                          onChanged: (newValue) {
-                            setState(() {
-                              _controller.selectLine(i, newValue);
-                            });
+                        ValueListenableBuilder<int>(
+                          valueListenable: _stationChangeNotifier,
+                          builder: (context, _, child) {
+                            return RouteLineNode(
+                              segmentIndex: i,
+                              availableLines: _controller.getAvailableLines(i),
+                              selectedLine: _controller.getSelectedLine(i),
+                              onChanged: (newValue) {
+                                _controller.selectLine(i, newValue);
+                              },
+                            );
                           },
                         ),
                     ],
