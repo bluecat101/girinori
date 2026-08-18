@@ -6,12 +6,12 @@ import 'package:girinori/widgets/route_line_node.dart';
 
 class AddRouteScreen extends StatefulWidget {
   final Map<String, Map<String, List<dynamic>>> routeMaster;
-  final List<TransitRoute>? editingRoutes;
+  final TransitRoute? editingRoute;
 
   const AddRouteScreen({
     super.key,
     required this.routeMaster,
-    this.editingRoutes,
+    this.editingRoute,
   });
 
   @override
@@ -32,7 +32,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
     super.initState();
     _controller = RouteInputController(
       routeMaster: widget.routeMaster,
-      editingRoutes: widget.editingRoutes,
+      editingRoute: widget.editingRoute,
     );
   }
 
@@ -71,7 +71,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
       backgroundColor: const Color(0xFF121214),
       appBar: AppBar(
         title: Text(
-          widget.editingRoutes != null ? 'ルートの一括編集' : 'ルートの一括作成',
+          widget.editingRoute != null ? 'ルートの一括編集' : 'ルートの一括作成',
           style: const TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -225,7 +225,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
               child: SafeArea(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: widget.editingRoutes != null
+                    backgroundColor: widget.editingRoute != null
                         ? Colors.orangeAccent
                         : const Color(0xFF00E676),
                     foregroundColor: Colors.black,
@@ -266,11 +266,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                       return;
                     }
 
-                    List<TransitRoute> results = _controller.compileAllRoutes();
-                    Navigator.pop(context, results);
+                    // List<TransitRoute> results = _controller.compileAllRoutes();
+                    // Navigator.pop(context, results);
+                    final result = _controller.compileRoute();
+                    Navigator.pop(context, result);
                   },
                   child: Text(
-                    widget.editingRoutes != null
+                    widget.editingRoute != null
                         ? "全 ${_routes.length} 個の変更を保存する"
                         : "全 ${_routes.length} 個のルートを一括登録する",
                     style: const TextStyle(

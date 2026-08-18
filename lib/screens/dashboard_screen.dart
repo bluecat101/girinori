@@ -282,7 +282,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       MaterialPageRoute(
         builder: (context) => AddRouteScreen(
           routeMaster: myLoadedRouteMaster,
-          editingRoutes: [myRoutes[index]],
+          editingRoute: myRoutes[index],
         ),
       ),
     );

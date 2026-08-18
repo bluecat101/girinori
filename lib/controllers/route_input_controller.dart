@@ -22,7 +22,7 @@ class RouteInputData {
 }
 
 class RouteInputController {
-  RouteInputController({required this.routeMaster, this.editingRoutes}) {
+  RouteInputController({required this.routeMaster, this.editingRoute}) {
     initialize();
   }
 
@@ -30,7 +30,8 @@ class RouteInputController {
   // Data
   // ============================================================
   final Map<String, Map<String, List<dynamic>>> routeMaster;
-  final List<TransitRoute>? editingRoutes;
+  final TransitRoute? editingRoute;
+  // final List<TransitRoute>? editingRoutes;
 
   // ============================================================
   // 共通駅
@@ -53,7 +54,7 @@ class RouteInputController {
   // 初期化
   // ============================================================
   void initialize() {
-    if (editingRoutes != null && editingRoutes!.isNotEmpty) {
+    if (editingRoute != null) {
       _initializeFromEditingRoutes();
     } else {
       _initializeNewRoute();
@@ -71,34 +72,32 @@ class RouteInputController {
   // 編集データから初期化
   // ============================================================
   void _initializeFromEditingRoutes() {
-    final firstRoute = editingRoutes!.first;
+    final route = editingRoute!;
     departureController = TextEditingController(
-      text: firstRoute.segments.first.departureStation,
+      text: route.segments.first.departureStation,
     );
     arrivalController = TextEditingController(
-      text: firstRoute.segments.last.arrivalStation,
+      text: route.segments.last.arrivalStation,
     );
-    for (final route in editingRoutes!) {
-      formKeys.add(GlobalKey<FormState>());
-      final inputData = RouteInputData(defaultName: route.name);
-      for (int i = 0; i < route.segments.length; i++) {
-        final segment = route.segments[i];
-        if (i == 0) {
-          inputData.selectedLines.add(segment.line);
-        } else {
-          inputData.viaStationControllers.add(
-            TextEditingController(text: segment.departureStation),
-          );
-          inputData.selectedLines.add(segment.line);
-        }
-        if (i < route.segments.length - 1) {
-          inputData.walkTimeControllers.add(
-            TextEditingController(text: segment.walkTimeAfter.toString()),
-          );
-        }
+    formKeys.add(GlobalKey<FormState>());
+    final inputData = RouteInputData(defaultName: route.name);
+    for (int i = 0; i < route.segments.length; i++) {
+      final segment = route.segments[i];
+      if (i == 0) {
+        inputData.selectedLines.add(segment.line);
+      } else {
+        inputData.viaStationControllers.add(
+          TextEditingController(text: segment.departureStation),
+        );
+        inputData.selectedLines.add(segment.line);
       }
-      routes.add(inputData);
+      if (i < route.segments.length - 1) {
+        inputData.walkTimeControllers.add(
+          TextEditingController(text: segment.walkTimeAfter.toString()),
+        );
+      }
     }
+    routes.add(inputData);
   }
 
   // ============================================================
@@ -242,58 +241,93 @@ class RouteInputController {
   }
 
   // ============================================================
-  // 全ルートをTransitRouteへ変換
+  // ルートをTransitRouteへ変換
   // ============================================================
+  TransitRoute compileRoute() {
+    final route = currentRoute;
 
-  List<TransitRoute> compileAllRoutes() {
-    print("compileAllRoutes");
-    final compiledRoutes = <TransitRoute>[];
-    for (int routeIndex = 0; routeIndex < routes.length; routeIndex++) {
-      final routeData = routes[routeIndex];
-      final segments = <TransitSegment>[];
-      final totalSegments = routeData.selectedLines.length;
-      for (int i = 0; i < totalSegments; i++) {
-        final String dep;
-        if (i == 0) {
-          dep = departureController.text;
-        } else {
-          dep = routeData.viaStationControllers[i - 1].text;
-        }
+    final segments = <TransitSegment>[];
 
-        final String arr;
-        if (i == totalSegments - 1) {
-          arr = arrivalController.text;
-        } else {
-          arr = routeData.viaStationControllers[i].text;
-        }
+    for (int i = 0; i < route.selectedLines.length; i++) {
+      final departureStation = i == 0
+          ? departureController.text.trim()
+          : route.viaStationControllers[i - 1].text.trim();
 
-        final int walk;
-        if (i < routeData.walkTimeControllers.length) {
-          walk = int.tryParse(routeData.walkTimeControllers[i].text) ?? 0;
-        } else {
-          walk = 0;
-        }
-        segments.add(
-          TransitSegment(
-            departureStation: dep,
-            line: routeData.selectedLines[i] ?? '',
-            duration: 15,
-            arrivalStation: arr,
-            walkTimeAfter: walk,
-          ),
-        );
-      }
+      final arrivalStation = i == route.selectedLines.length - 1
+          ? arrivalController.text.trim()
+          : route.viaStationControllers[i].text.trim();
 
-      compiledRoutes.add(
-        TransitRoute(
-          id: '${DateTime.now().millisecondsSinceEpoch}$routeIndex',
-          name: routeData.nameController.text,
-          segments: segments,
+      final walkTime = i < route.walkTimeControllers.length
+          ? int.tryParse(route.walkTimeControllers[i].text.trim()) ?? 0
+          : 0;
+
+      segments.add(
+        TransitSegment(
+          departureStation: departureStation,
+          line: route.selectedLines[i] ?? '',
+          duration: 15,
+          arrivalStation: arrivalStation,
+          walkTimeAfter: walkTime,
         ),
       );
     }
-    return compiledRoutes;
+
+    return TransitRoute(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: route.nameController.text.trim(),
+      segments: segments,
+    );
   }
+
+  // List<TransitRoute> compileAllRoutes() {
+  //   print("compileAllRoutes");
+  //   final compiledRoutes = <TransitRoute>[];
+  //   for (int routeIndex = 0; routeIndex < routes.length; routeIndex++) {
+  //     final routeData = routes[routeIndex];
+  //     final segments = <TransitSegment>[];
+  //     final totalSegments = routeData.selectedLines.length;
+  //     for (int i = 0; i < totalSegments; i++) {
+  //       final String dep;
+  //       if (i == 0) {
+  //         dep = departureController.text;
+  //       } else {
+  //         dep = routeData.viaStationControllers[i - 1].text;
+  //       }
+
+  //       final String arr;
+  //       if (i == totalSegments - 1) {
+  //         arr = arrivalController.text;
+  //       } else {
+  //         arr = routeData.viaStationControllers[i].text;
+  //       }
+
+  //       final int walk;
+  //       if (i < routeData.walkTimeControllers.length) {
+  //         walk = int.tryParse(routeData.walkTimeControllers[i].text) ?? 0;
+  //       } else {
+  //         walk = 0;
+  //       }
+  //       segments.add(
+  //         TransitSegment(
+  //           departureStation: dep,
+  //           line: routeData.selectedLines[i] ?? '',
+  //           duration: 15,
+  //           arrivalStation: arr,
+  //           walkTimeAfter: walk,
+  //         ),
+  //       );
+  //     }
+
+  //     compiledRoutes.add(
+  //       TransitRoute(
+  //         id: '${DateTime.now().millisecondsSinceEpoch}$routeIndex',
+  //         name: routeData.nameController.text,
+  //         segments: segments,
+  //       ),
+  //     );
+  //   }
+  //   return compiledRoutes;
+  // }
 
   // ============================================================
   // Dispose
