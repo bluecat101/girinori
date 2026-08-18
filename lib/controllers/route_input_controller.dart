@@ -40,9 +40,9 @@ class RouteInputController {
   late final TextEditingController arrivalController;
 
   // ============================================================
-  // Routes
+  // Route
   // ============================================================
-  final List<RouteInputData> routes = [];
+  RouteInputData route = RouteInputData(defaultName: 'ルート 1');
   int currentRouteIndex = 0;
 
   // ============================================================
@@ -63,9 +63,9 @@ class RouteInputController {
   // ============================================================
   // Getters
   // ============================================================
-  RouteInputData get currentRoute => routes[currentRouteIndex];
+  RouteInputData get currentRoute => route;
   int get totalNodes => currentRoute.viaStationControllers.length + 2;
-  int get routeCount => routes.length;
+  // int get routeCount => route.length;
 
   // ============================================================
   // 編集データから初期化
@@ -96,7 +96,8 @@ class RouteInputController {
         );
       }
     }
-    routes.add(inputData);
+    // this.route.add(inputData);
+    this.route = inputData;
   }
 
   // ============================================================
@@ -109,35 +110,7 @@ class RouteInputController {
     final route = RouteInputData(defaultName: 'ルート 1');
     // 最初の区間の路線選択欄を用意する
     route.selectedLines.add(null);
-    routes.add(route);
-  }
-
-  // ============================================================
-  // ルート追加
-  // ============================================================
-  // void addNewRouteTemplate() {
-  //   final nextNumber = routes.length + 1;
-  //   formKeys.add(GlobalKey<FormState>());
-  //   routes.add(RouteInputData(defaultName: 'ルート $nextNumber'));
-  //   currentRouteIndex = routes.length - 1;
-  // }
-
-  // ============================================================
-  // ルート削除
-  // ============================================================
-  void removeRoute() {
-    if (routes.length <= 1) {
-      return;
-    }
-
-    routes[currentRouteIndex].dispose();
-    routes.removeAt(currentRouteIndex);
-    formKey = GlobalKey<FormState>();
-    // if (currentRouteIndex >= routes.length) {
-    //   currentRouteIndex = routes.length - 1;
-    // } else {
-    //   currentRouteIndex = index;
-    // }
+    this.route = route;
   }
 
   // ============================================================
@@ -164,8 +137,7 @@ class RouteInputController {
     route.walkTimeControllers[viaIndex].dispose();
     route.viaStationControllers.removeAt(viaIndex);
     route.walkTimeControllers.removeAt(viaIndex);
-    // 経由駅を1つ削除すると、
-    // その駅に対応する路線を削除
+    // 経由駅を1つ削除すると、その駅に対応する路線を削除
     if (viaIndex + 1 < route.selectedLines.length) {
       route.selectedLines.removeAt(viaIndex + 1);
     }
@@ -278,65 +250,12 @@ class RouteInputController {
     );
   }
 
-  // List<TransitRoute> compileAllRoutes() {
-  //   print("compileAllRoutes");
-  //   final compiledRoutes = <TransitRoute>[];
-  //   for (int routeIndex = 0; routeIndex < routes.length; routeIndex++) {
-  //     final routeData = routes[routeIndex];
-  //     final segments = <TransitSegment>[];
-  //     final totalSegments = routeData.selectedLines.length;
-  //     for (int i = 0; i < totalSegments; i++) {
-  //       final String dep;
-  //       if (i == 0) {
-  //         dep = departureController.text;
-  //       } else {
-  //         dep = routeData.viaStationControllers[i - 1].text;
-  //       }
-
-  //       final String arr;
-  //       if (i == totalSegments - 1) {
-  //         arr = arrivalController.text;
-  //       } else {
-  //         arr = routeData.viaStationControllers[i].text;
-  //       }
-
-  //       final int walk;
-  //       if (i < routeData.walkTimeControllers.length) {
-  //         walk = int.tryParse(routeData.walkTimeControllers[i].text) ?? 0;
-  //       } else {
-  //         walk = 0;
-  //       }
-  //       segments.add(
-  //         TransitSegment(
-  //           departureStation: dep,
-  //           line: routeData.selectedLines[i] ?? '',
-  //           duration: 15,
-  //           arrivalStation: arr,
-  //           walkTimeAfter: walk,
-  //         ),
-  //       );
-  //     }
-
-  //     compiledRoutes.add(
-  //       TransitRoute(
-  //         id: '${DateTime.now().millisecondsSinceEpoch}$routeIndex',
-  //         name: routeData.nameController.text,
-  //         segments: segments,
-  //       ),
-  //     );
-  //   }
-  //   return compiledRoutes;
-  // }
-
   // ============================================================
   // Dispose
   // ============================================================
   void dispose() {
     departureController.dispose();
     arrivalController.dispose();
-    for (final route in routes) {
-      route.dispose();
-    }
   }
 
   /// ============================================================
