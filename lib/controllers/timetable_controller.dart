@@ -60,7 +60,7 @@ class TimetableController {
     try {
       final safeFilename = lineId.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
       final jsonString = await rootBundle.loadString(
-        'assets/timetables/$safeFilename.json',
+        'assets/$safeFilename.json',
       );
       final Map<String, dynamic> lineData = jsonDecode(jsonString);
       if (lineData.containsKey('trips')) {
@@ -80,7 +80,7 @@ class TimetableController {
   // ============================================================
   // 曜日判定
   // ============================================================
-  String getTodayDayType() {
+  String _getTodayDayType() {
     final now = DateTime.now();
     if (now.weekday == DateTime.saturday) {
       return 'saturday';
@@ -106,11 +106,10 @@ class TimetableController {
     if (jsonTrips == null) {
       return (baseTime, baseTime);
     }
-    final dayType = getTodayDayType();
+    final dayType = _getTodayDayType();
     final baseMinutes = baseTime.hour * 60 + baseTime.minute;
     final validTrips = <Map<String, dynamic>>[];
     final depMinutesList = <int>[];
-
     // ----------------------------------------------------------
     // 今日走っている列車を抽出
     // ----------------------------------------------------------
@@ -194,13 +193,5 @@ class TimetableController {
   TimeOfDay addMinutes(TimeOfDay time, int minutes) {
     final total = time.hour * 60 + time.minute + minutes;
     return TimeOfDay(hour: (total ~/ 60) % 24, minute: total % 60);
-  }
-
-  // ============================================================
-  // 時刻表示
-  // ============================================================
-  String formatTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:'
-        '${time.minute.toString().padLeft(2, '0')}';
   }
 }

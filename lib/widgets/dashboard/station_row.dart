@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:girinori/models/transit_model.dart';
+import 'package:girinori/utils/format_time.dart';
 
 class DashboardStationRow extends StatelessWidget {
   final String routeId;
@@ -44,27 +45,20 @@ class DashboardStationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color nodeColor = isStart
         ? const Color(0xFF00E676)
-        : (isEnd
-            ? Colors.redAccent
-            : const Color(0xFF00B0FF));
+        : (isEnd ? Colors.redAccent : const Color(0xFF00B0FF));
 
-    final String shiftLabel =
-        _buildShiftLabel();
+    final String shiftLabel = _buildShiftLabel();
 
     return Row(
-      crossAxisAlignment:
-          CrossAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         // ==================================================
         // 駅ノード
         // ==================================================
-
         Icon(
           isStart
               ? Icons.radio_button_checked
-              : (isEnd
-                  ? Icons.location_on
-                  : Icons.brightness_1),
+              : (isEnd ? Icons.location_on : Icons.brightness_1),
           color: nodeColor,
           size: 14,
         ),
@@ -74,21 +68,18 @@ class DashboardStationRow extends StatelessWidget {
         // ==================================================
         // 駅情報
         // ==================================================
-
         Expanded(
           child: Column(
-            crossAxisAlignment:
-                CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               if (arrivalTime != null)
                 Text(
-                  '${_formatTime(arrivalTime!)}着',
+                  '${formatTime(arrivalTime!)}着',
                   style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 10,
-                    fontWeight:
-                        FontWeight.w500,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
 
@@ -97,15 +88,11 @@ class DashboardStationRow extends StatelessWidget {
               Text(
                 stationName,
                 maxLines: 1,
-                overflow:
-                    TextOverflow.ellipsis,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
-                  fontWeight:
-                      FontWeight.bold,
-                  color: isEnd
-                      ? Colors.redAccent
-                      : Colors.white,
+                  fontWeight: FontWeight.bold,
+                  color: isEnd ? Colors.redAccent : Colors.white,
                 ),
               ),
 
@@ -115,31 +102,23 @@ class DashboardStationRow extends StatelessWidget {
                 Row(
                   children: [
                     Text(
-                      '${_formatTime(departureTime!)}発',
+                      '${formatTime(departureTime!)}発',
                       style: TextStyle(
                         color: isStart
-                            ? const Color(
-                                0xFF00E676,
-                              )
-                            : const Color(
-                                0xFF00B0FF,
-                              ),
+                            ? const Color(0xFF00E676)
+                            : const Color(0xFF00B0FF),
                         fontSize: 11,
-                        fontWeight:
-                            FontWeight.bold,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
 
                     if (shiftLabel.isNotEmpty)
                       Text(
                         shiftLabel,
-                        style:
-                            const TextStyle(
-                          color:
-                              Colors.orangeAccent,
+                        style: const TextStyle(
+                          color: Colors.orangeAccent,
                           fontSize: 9,
-                          fontWeight:
-                              FontWeight.bold,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                   ],
@@ -151,9 +130,7 @@ class DashboardStationRow extends StatelessWidget {
         // ==================================================
         // 列車変更ボタン
         // ==================================================
-
-        if (!isEnd)
-          _buildShiftButtons(),
+        if (!isEnd) _buildShiftButtons(),
       ],
     );
   }
@@ -189,13 +166,10 @@ class DashboardStationRow extends StatelessWidget {
             size: 16,
           ),
           padding: EdgeInsets.zero,
-          constraints:
-              const BoxConstraints(),
+          constraints: const BoxConstraints(),
 
           // false = 1本前
-          onPressed: onShiftTrain == null
-              ? null
-              : () => onShiftTrain!(false),
+          onPressed: onShiftTrain == null ? null : () => onShiftTrain!(false),
         ),
 
         IconButton(
@@ -205,24 +179,12 @@ class DashboardStationRow extends StatelessWidget {
             size: 16,
           ),
           padding: EdgeInsets.zero,
-          constraints:
-              const BoxConstraints(),
+          constraints: const BoxConstraints(),
 
           // true = 1本後
-          onPressed: onShiftTrain == null
-              ? null
-              : () => onShiftTrain!(true),
+          onPressed: onShiftTrain == null ? null : () => onShiftTrain!(true),
         ),
       ],
     );
-  }
-
-  // ============================================================
-  // 時刻フォーマット
-  // ============================================================
-
-  String _formatTime(TimeOfDay time) {
-    return '${time.hour.toString().padLeft(2, '0')}:'
-        '${time.minute.toString().padLeft(2, '0')}';
   }
 }

@@ -1,9 +1,9 @@
-import 'dart:convert'; // 💡 JSONパースに必要です
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
+import 'package:girinori/utils/format_time.dart';
 import 'package:girinori/widgets/dashboard/station_row.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -16,10 +16,6 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   // 💡 【新設計】クローラーが作った駅マスタを保持する変数
   Map<String, Map<String, List<dynamic>>> myLoadedRouteMaster = {};
-
-  // 💡 【新設計】現在表示しているルートで使う路線の時刻表データ（trips）だけを小分けにキャッシュする場所
-  // Key: "ＪＲ根岸線_大宮・南浦和方面"、 Value: その路線の trips 配列
-  final Map<String, List<dynamic>> _cachedTimetables = {};
 
   bool _isLoading = true; // 駅マスタと初期ルートのファイル読み込み管理フラグ
 
@@ -80,36 +76,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  // 💡 【新設計】必要な路線の個別時刻表ファイル（timetable_xxx.json）をピンポイントでオンデマンド読込
-  Future<void> _loadTimetableFileForLine(String lineId) async {
-    // すでにロード済み（キャッシュにある）なら何もしない（メモリの節約）
-    if (_cachedTimetables.containsKey(lineId)) return;
-
-    try {
-      // 禁止文字を安全に置換したファイル名を指定
-      final safeFilename = lineId.replaceAll(RegExp(r'[\\/:*?"<>|]'), "_");
-      final jsonString = await rootBundle.loadString(
-        'assets/timetables/$safeFilename.json',
-      );
-      final Map<String, dynamic> lineData = jsonDecode(jsonString);
-
-      if (lineData.containsKey('trips')) {
-        _cachedTimetables[lineId] = lineData['trips'] as List<dynamic>;
-        print(
-          "🚊 路線ファイルのロード成功: timetable_$safeFilename.json (${_cachedTimetables[lineId]!.length}本収容)",
-        );
-      }
-    } catch (e) {
-      print("❌ 路線ファイル [ $lineId ] のロードに失敗しました（ファイルがないかアセット未登録）: $e");
-    }
-  }
-
   void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
     setState(() {
       final key = "${routeId}_$segmentIndex";
       final currentShift = _segmentShiftCounts[key] ?? 0;
 
-      // 次へなら+1、前へなら-1
       _segmentShiftCounts[key] = isNext ? currentShift + 1 : currentShift - 1;
     });
   }
@@ -124,7 +95,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
     }
-
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
       appBar: _buildAppBar(),
@@ -154,12 +124,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         lineId: segment.line,
         departureStation: segment.departureStation,
         arrivalStation: segment.arrivalStation,
-        baseTime: baseTime,
+        baseTime: runningTime,
         shiftCount: shiftCount,
       );
 
       departureTimes.add(dep);
-      arrivalTimes.add(arr); // 💡 これで「1229」がそのまま格納されます！
+      arrivalTimes.add(arr);
 
       // 次の乗り換えがある場合は、本物の到着時刻に徒歩時間を足す
       runningTime = _timetableController.addMinutes(arr, segment.walkTimeAfter);
@@ -188,7 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              "${_timetableController.formatTime(arrivalTimes.last)} 着",
+              "${formatTime(arrivalTimes.last)} 着",
               style: const TextStyle(
                 color: Color(0xFF00E676),
                 fontWeight: FontWeight.bold,
@@ -200,6 +170,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               child: SingleChildScrollView(
                 child: Column(
                   children: [
+                    // 出発駅、経由駅を表示する
                     for (int i = 0; i < route.segments.length; i++) ...[
                       DashboardStationRow(
                         routeId: route.id,
@@ -211,14 +182,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         isStart: i == 0,
                         isEnd: false,
                         shiftCount: _segmentShiftCounts['${route.id}_$i'] ?? 0,
+                        // onShiftTrain: (forward) {
+                        //   setState(() {
+                        //     _shiftTrainCount(route.id, i, forward);
+                        //   });
+                        // },
                         onShiftTrain: (forward) {
-                          setState(() {
-                            _shiftTrainCount(route.id, i, forward);
-                          });
+                          _shiftTrainCount(route.id, i, forward);
                         },
                       ),
                       _buildLineRow(route.segments[i].line),
                     ],
+                    // 到着駅を表示する
                     DashboardStationRow(
                       routeId: route.id,
                       segmentIndex: route.segments.length,
@@ -257,7 +232,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
     for (final segment in newRoute.segments) {
       if (segment.line.isNotEmpty) {
-        await _loadTimetableFileForLine(segment.line);
+        await _timetableController.loadTimetableFileForLine(segment.line);
       }
     }
     final now = DateTime.now();
@@ -269,11 +244,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       _isLoading = false;
     });
-    _pageController.animateToPage(
-      myRoutes.length - 1,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeOut,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          myRoutes.length - 1,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
 
   Future<void> _editRoute(int index) async {
@@ -294,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
     for (final segment in updatedRoute.segments) {
       if (segment.line.isNotEmpty) {
-        await _loadTimetableFileForLine(segment.line);
+        await _timetableController.loadTimetableFileForLine(segment.line);
       }
     }
     setState(() {
