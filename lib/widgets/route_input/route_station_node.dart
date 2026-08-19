@@ -212,56 +212,99 @@ class _WalkTimeField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      // PCでも数字以外を入力させない
-      inputFormatters: [
-        TextInputFormatter.withFunction((oldValue, newValue) {
-          // 空文字は許可
-          if (newValue.text.isEmpty) {
-            return newValue;
-          }
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: controller,
+            keyboardType: TextInputType.number,
+            inputFormatters: [
+              TextInputFormatter.withFunction((oldValue, newValue) {
+                if (newValue.text.isEmpty) {
+                  return newValue;
+                }
+                if (RegExp(r'^[0-9]+$').hasMatch(newValue.text)) {
+                  return newValue;
+                }
+                return oldValue;
+              }),
+            ],
+            style: const TextStyle(fontSize: 13, color: Colors.white),
+            decoration: InputDecoration(
+              labelText: '乗換(分)',
+              suffixText: '分',
+              labelStyle: const TextStyle(color: Colors.grey, fontSize: 11),
+              suffixStyle: const TextStyle(color: Colors.grey, fontSize: 11),
+              filled: true,
+              fillColor: const Color(0xFF121214),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 10,
+              ),
+              prefixIcon: const Icon(
+                Icons.directions_walk,
+                color: Colors.orangeAccent,
+                size: 17,
+              ),
+            ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return '必須';
+              }
+              if (int.tryParse(value.trim()) == null) {
+                return '数値';
+              }
+              return null;
+            },
+          ),
+        ),
 
-          // 0〜9だけなら許可
-          if (RegExp(r'^[0-9]+$').hasMatch(newValue.text)) {
-            return newValue;
-          }
+        const SizedBox(width: 4),
 
-          // 数字以外が含まれたら変更を拒否
-          return oldValue;
-        }),
+        // 上下ボタン
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildNumberButton(
+              icon: Icons.keyboard_arrow_up,
+              onPressed: () {
+                final current = int.tryParse(controller.text) ?? 0;
+                controller.text = (current + 1).toString();
+              },
+            ),
+            _buildNumberButton(
+              icon: Icons.keyboard_arrow_down,
+              onPressed: () {
+                final current = int.tryParse(controller.text) ?? 0;
+
+                if (current > 0) {
+                  controller.text = (current - 1).toString();
+                }
+              },
+            ),
+          ],
+        ),
       ],
-      style: const TextStyle(fontSize: 13, color: Colors.white),
-      decoration: InputDecoration(
-        labelText: '乗換(分)',
-        suffixText: '分',
-        labelStyle: const TextStyle(color: Colors.grey, fontSize: 11),
-        suffixStyle: const TextStyle(color: Colors.grey, fontSize: 11),
-        filled: true,
-        fillColor: const Color(0xFF121214),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: BorderSide.none,
-        ),
+    );
+  }
 
-        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
-        prefixIcon: const Icon(
-          Icons.directions_walk,
-          color: Colors.orangeAccent,
-          size: 17,
-        ),
+  Widget _buildNumberButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: 32,
+      height: 24,
+      child: IconButton(
+        padding: EdgeInsets.zero,
+        icon: Icon(icon, size: 20, color: Colors.white70),
+        onPressed: onPressed,
       ),
-
-      validator: (value) {
-        if (value == null || value.trim().isEmpty) {
-          return '必須';
-        }
-        if (int.tryParse(value.trim()) == null) {
-          return '数値';
-        }
-        return null;
-      },
     );
   }
 }
