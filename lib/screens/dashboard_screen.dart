@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
-import 'package:girinori/utils/format_time.dart';
-import 'package:girinori/widgets/dashboard/station_row.dart';
+import 'package:girinori/widgets/dashboard/route_page_view.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -105,115 +104,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 style: TextStyle(color: Colors.grey),
               ),
             )
-          : _buildRoutePageView(),
-    );
-  }
-
-  Widget _buildRouteTimelineCard(TransitRoute route) {
-    final baseTime = _routeBaseTimes[route.id] ?? TimeOfDay.now();
-    List<TimeOfDay> departureTimes = [];
-    List<TimeOfDay> arrivalTimes = [];
-    TimeOfDay runningTime = baseTime;
-
-    for (int i = 0; i < route.segments.length; i++) {
-      final segment = route.segments[i];
-      // この区間のシフト数のキーを作成して取得する
-      final shiftKey = '${route.id}_$i';
-      final shiftCount = _segmentShiftCounts[shiftKey] ?? 0;
-      final (dep, arr) = _timetableController.findNextTrainTimes(
-        lineId: segment.line,
-        departureStation: segment.departureStation,
-        arrivalStation: segment.arrivalStation,
-        baseTime: runningTime,
-        shiftCount: shiftCount,
-      );
-
-      departureTimes.add(dep);
-      arrivalTimes.add(arr);
-
-      // 次の乗り換えがある場合は、本物の到着時刻に徒歩時間を足す
-      runningTime = _timetableController.addMinutes(arr, segment.walkTimeAfter);
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E24),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.05)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              route.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+          : RoutePageView(
+              routes: myRoutes,
+              routeBaseTimes: _routeBaseTimes,
+              segmentShiftCounts: _segmentShiftCounts,
+              pageController: _pageController,
+              timetableController: _timetableController,
+              onEditRoute: _editRoute,
+              onShiftTrain: _shiftTrainCount,
             ),
-            const SizedBox(height: 4),
-            Text(
-              "${formatTime(arrivalTimes.last)} 着",
-              style: const TextStyle(
-                color: Color(0xFF00E676),
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            const Divider(color: Colors.white10, height: 16),
-            Expanded(
-              child: SingleChildScrollView(
-                child: Column(
-                  children: [
-                    // 出発駅、経由駅を表示する
-                    for (int i = 0; i < route.segments.length; i++) ...[
-                      DashboardStationRow(
-                        routeId: route.id,
-                        segmentIndex: i,
-                        stationName: route.segments[i].departureStation,
-                        arrivalTime: i == 0 ? null : arrivalTimes[i - 1],
-                        departureTime: departureTimes[i],
-                        segment: route.segments[i],
-                        isStart: i == 0,
-                        isEnd: false,
-                        shiftCount: _segmentShiftCounts['${route.id}_$i'] ?? 0,
-                        // onShiftTrain: (forward) {
-                        //   setState(() {
-                        //     _shiftTrainCount(route.id, i, forward);
-                        //   });
-                        // },
-                        onShiftTrain: (forward) {
-                          _shiftTrainCount(route.id, i, forward);
-                        },
-                      ),
-                      _buildLineRow(route.segments[i].line),
-                    ],
-                    // 到着駅を表示する
-                    DashboardStationRow(
-                      routeId: route.id,
-                      segmentIndex: route.segments.length,
-                      stationName: route.segments.last.arrivalStation,
-                      arrivalTime: arrivalTimes.last,
-                      departureTime: null,
-                      segment: route.segments.last,
-                      isStart: false,
-                      isEnd: true,
-                      // 到着駅には列車変更ボタンがない
-                      shiftCount: 0,
-                      onShiftTrain: null,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -301,58 +200,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             size: 26,
           ),
           onPressed: _addRoute,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildRoutePageView() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: PageView.builder(
-        controller: _pageController,
-        itemCount: myRoutes.length,
-        padEnds: false,
-        itemBuilder: (context, index) {
-          return Padding(
-            padding: const EdgeInsets.only(left: 12.0, top: 4.0, bottom: 4.0),
-            child: GestureDetector(
-              onTap: () => _editRoute(index),
-              child: _buildRouteTimelineCard(myRoutes[index]),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // --- ➔ 路線要素（スリム化） ---
-  Widget _buildLineRow(String lineName) {
-    // 💡 画面表示用に prefix（ＪＲ根岸線_大宮・南浦和方面）から路線名だけを切り出す
-    final cleanName = lineName.split('_')[0];
-
-    return Row(
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 6.0),
-          child: Container(
-            width: 1,
-            height: 16,
-            color: const Color(0xFF00B0FF).withOpacity(0.5),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            cleanName,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF00B0FF),
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
         ),
       ],
     );
