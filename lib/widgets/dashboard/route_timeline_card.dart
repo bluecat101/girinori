@@ -94,6 +94,10 @@ class RouteTimelineCard extends StatelessWidget {
                         segment: route.segments[i],
                         isStart: i == 0,
                         isEnd: false,
+                        isNextButtonEnabled:
+                            timetableController.hasNextTimeTable,
+                        isPreviousButtonEnabled:
+                            timetableController.hasPreviousTimeTable,
                         shiftCount: segmentShiftCounts['${route.id}_$i'] ?? 0,
                         onShiftTrain: (isNext) {
                           // _shiftTrainCount(route.id, i, forward);
@@ -111,8 +115,10 @@ class RouteTimelineCard extends StatelessWidget {
                       departureTime: null,
                       segment: route.segments.last,
                       isStart: false,
-                      isEnd: true,
-                      // 到着駅には列車変更ボタンがない
+                      isEnd: true, // 到着駅には列車変更ボタンがない
+                      isNextButtonEnabled: timetableController.hasNextTimeTable,
+                      isPreviousButtonEnabled:
+                          timetableController.hasPreviousTimeTable,
                       shiftCount: 0,
                       onShiftTrain: null,
                     ),

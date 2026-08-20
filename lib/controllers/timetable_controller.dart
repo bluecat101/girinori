@@ -35,6 +35,13 @@ class TimetableController {
   final Map<String, Map<String, Map<String, TrainDayRange>>> trainDayRanges =
       {};
 
+  // 次の時刻表を表示できるのかを定義
+  bool _hasNextTimeTable = true;
+  bool _hasPreviousTimeTable = true;
+
+  bool get hasNextTimeTable => _hasNextTimeTable;
+  bool get hasPreviousTimeTable => _hasPreviousTimeTable;
+
   // ============================================================
   // 駅マスタ読み込み
   // ============================================================
@@ -299,9 +306,7 @@ class TimetableController {
       }
     }
 
-    if (baseIndex == -1) {
-      baseIndex = candidates.length - 1;
-    }
+    assert(baseIndex != -1, '時刻表から検索できませんでした。');
 
     // ============================================================
     // shiftCount
@@ -314,6 +319,10 @@ class TimetableController {
       targetIndex = candidates.length - 1;
     }
     final target = candidates[targetIndex];
+
+    _hasNextTimeTable = (targetIndex != candidates.length - 1);
+    _hasPreviousTimeTable = (targetIndex != 0);
+
     // ============================================================
     // TimeOfDayへ変換
     // ============================================================

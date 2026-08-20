@@ -16,6 +16,8 @@ class DashboardStationRow extends StatelessWidget {
 
   final bool isStart;
   final bool isEnd;
+  final bool isNextButtonEnabled;
+  final bool isPreviousButtonEnabled;
 
   /// 現在の列車から何本ずれているか
   ///
@@ -37,6 +39,8 @@ class DashboardStationRow extends StatelessWidget {
     required this.segment,
     required this.isStart,
     required this.isEnd,
+    required this.isNextButtonEnabled,
+    required this.isPreviousButtonEnabled,
     this.shiftCount = 0,
     this.onShiftTrain,
   });
@@ -143,11 +147,9 @@ class DashboardStationRow extends StatelessWidget {
     if (shiftCount > 0) {
       return ' [$shiftCount本後]';
     }
-
     if (shiftCount < 0) {
       return ' [${shiftCount.abs()}本前]';
     }
-
     return '';
   }
 
@@ -159,32 +161,24 @@ class DashboardStationRow extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          icon: const Icon(
-            Icons.keyboard_arrow_left,
-            color: Colors.white38,
-            size: 16,
-          ),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-
-          // false = 1本前
-          onPressed: onShiftTrain == null ? null : () => onShiftTrain!(false),
-        ),
-
-        IconButton(
-          icon: const Icon(
-            Icons.keyboard_arrow_right,
-            color: Colors.white38,
-            size: 16,
-          ),
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(),
-
-          // true = 1本後
-          onPressed: onShiftTrain == null ? null : () => onShiftTrain!(true),
-        ),
+        _shiftIconButton(isNext: false, enabled: isPreviousButtonEnabled),
+        _shiftIconButton(isNext: true, enabled: isNextButtonEnabled),
       ],
+    );
+  }
+
+  Widget _shiftIconButton({required bool isNext, required bool enabled}) {
+    return IconButton(
+      icon: Icon(
+        isNext ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_left,
+        color: enabled ? Colors.white38 : Colors.white12,
+        size: 16,
+      ),
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(),
+      onPressed: enabled && onShiftTrain != null
+          ? () => onShiftTrain!(isNext)
+          : null,
     );
   }
 }
