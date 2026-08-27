@@ -57,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _initializeData() async {
     await _timetableController.loadRouteMasterFile();
+    await _timetableController.loadTimetableIndex();
     for (final route in myRoutes) {
       for (final segment in route.segments) {
         if (segment.line.isNotEmpty) {

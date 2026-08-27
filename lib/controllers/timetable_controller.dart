@@ -35,6 +35,9 @@ class TimetableController {
   final Map<String, Map<String, Map<String, TrainDayRange>>> trainDayRanges =
       {};
 
+  /// 路線IDと時刻表ファイル名のマップ
+  Map<String, String> timetableFileMap = {};
+
   // 次の時刻表を表示できるのかを定義
   bool _hasNextTimeTable = true;
   bool _hasPreviousTimeTable = true;
@@ -76,32 +79,44 @@ class TimetableController {
   }
 
   // ============================================================
-  // 路線時刻表読み込み
+  // 路線時刻表インデックス読み込み
   // ============================================================
+  Future<void> loadTimetableIndex() async {
+    final jsonString = await rootBundle.loadString(
+      'assets/timetable_index.json',
+    );
+
+    final Map<String, dynamic> data = jsonDecode(jsonString);
+
+    timetableFileMap = data.map(
+      (key, value) => MapEntry(key, value.toString()),
+    );
+  }
+
   Future<void> loadTimetableFileForLine(String lineId) async {
-    // すでに読み込み済みなら何もしない
     if (cachedTimetables.containsKey(lineId)) {
       return;
     }
-    try {
-      final safeFilename = lineId.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
-      final jsonString = await rootBundle.loadString(
-        'assets/$safeFilename.json',
-      );
-      final Map<String, dynamic> lineData = jsonDecode(jsonString);
-      if (lineData.containsKey('trips')) {
-        cachedTimetables[lineId] = lineData['trips'] as List<dynamic>;
 
-        // 始発・終電を作成
-        _buildTrainDayRanges(lineId: lineId, trips: cachedTimetables[lineId]!);
-        debugPrint(
-          'tram 路線ファイルのロード成功: '
-          'timetable_$safeFilename.json '
-          '(${cachedTimetables[lineId]!.length}本収容)',
-        );
+    final fileName = timetableFileMap[lineId];
+
+    if (fileName == null) {
+      debugPrint('❌ timetable file not found: $lineId');
+      return;
+    }
+
+    try {
+      final jsonString = await rootBundle.loadString('assets/$fileName');
+
+      final Map<String, dynamic> lineData = jsonDecode(jsonString);
+
+      if (lineData['trips'] is List) {
+        cachedTimetables[lineId] = List<dynamic>.from(lineData['trips']);
       }
+      // 始発・終電を作成
+      _buildTrainDayRanges(lineId: lineId, trips: cachedTimetables[lineId]!);
     } catch (e) {
-      debugPrint('❌ 路線ファイル [$lineId] のロードに失敗: $e');
+      debugPrint('❌ 路線ファイル [$lineId] のロード失敗: $e');
     }
   }
 
