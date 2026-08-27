@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
+import 'package:girinori/services/widget_service.dart';
+import 'package:girinori/utils/format_time.dart';
 import 'package:girinori/widgets/dashboard/route_page_view.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -74,6 +76,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       _isLoading = false;
     });
+    await WidgetService.update(
+      route: '横浜 → 桜木町',
+      departure: formatTime(TimeOfDay.now()),
+      arrival: formatTime(TimeOfDay.now()),
+    );
   }
 
   void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
