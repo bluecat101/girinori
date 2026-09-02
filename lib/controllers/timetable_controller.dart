@@ -29,8 +29,8 @@ class TimetableController {
   Map<String, Map<String, List<dynamic>>> routeMaster = {};
 
   /// 路線ごとの時刻表キャッシュ
-  /// {路線ID: List<trips>}のマップ
-  final Map<String, List<dynamic>> cachedTimetables = {};
+  /// {路線ID: List< Trip >}のマップ
+  final Map<String, List<Trip>> cachedTimetables = {};
 
   /// {路線ID:{曜日区分:{駅:始発・終電}}}のマップ
   final Map<String, Map<String, Map<String, TrainDayRange>>> trainDayRanges =
@@ -128,19 +128,13 @@ class TimetableController {
   ///  ============================================================
   void _buildTrainDayRanges({
     required String lineId,
-    required List<dynamic> trips,
+    required List<Trip> trips,
   }) {
     final dayRanges = <String, Map<String, TrainDayRange>>{};
 
     for (final trip in trips) {
-      final dayType = trip['day_type'] as String?;
-      if (dayType == null) {
-        continue;
-      }
-      final stopTimes = trip['stop_times'] as Map<String, dynamic>?;
-      if (stopTimes == null) {
-        continue;
-      }
+      final dayType = trip.dayType;
+      final stopTimes = trip.stopTimes;
 
       // 曜日区分がまだなければ作る
       final stationRanges = dayRanges.putIfAbsent(
@@ -151,10 +145,10 @@ class TimetableController {
       // この列車に存在する全駅を見る
       for (final entry in stopTimes.entries) {
         final station = entry.key;
-        final timing = entry.value as Map<String, dynamic>;
+        final stopTime = entry.value;
 
         // depを優先し、なければarr
-        final int? minute = timing['dep'] as int? ?? timing['arr'] as int?;
+        final int? minute = stopTime.dep ?? stopTime.arr;
 
         if (minute == null) {
           continue;
@@ -249,11 +243,10 @@ class TimetableController {
 
       final candidates = <_TrainCandidate>[];
 
-      for (final rawTrip in jsonTrips) {
-        if (rawTrip['day_type'] != dayType) {
+      for (final trip in jsonTrips) {
+        if (trip.dayType != dayType) {
           continue;
         }
-        final trip = rawTrip as Trip;
         final stopTimes = trip.stopTimes;
 
         final depTiming = stopTimes[departureStation];

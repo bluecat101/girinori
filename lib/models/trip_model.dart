@@ -1,7 +1,7 @@
 class Trip {
-  final String tripId;
-  final String dayType;
-  final Map<String, StopTime> stopTimes;
+  final String tripId; // 路線名
+  final String dayType; // 平日/土/日祝
+  final Map<String, StopTime> stopTimes; // {駅: {停車時刻,出発時刻}}
 
   Trip({required this.tripId, required this.dayType, required this.stopTimes});
 
