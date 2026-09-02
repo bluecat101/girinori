@@ -2,37 +2,29 @@
 
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="12dp"
     android:background="#1E1E24">
 
+    <!-- ルート名 -->
     <TextView
         android:id="@+id/widget_route"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="横浜 → 桜木町"
+        android:text="横浜 → 大船"
         android:textColor="#FFFFFF"
         android:textSize="16sp"
         android:textStyle="bold" />
 
-    <TextView
-        android:id="@+id/widget_departure"
+    <!-- 駅一覧をここに動的に追加 -->
+    <LinearLayout
+        android:id="@+id/widget_station_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
-        android:text="07:32 発"
-        android:textColor="#00E676"
-        android:textSize="20sp"
-        android:textStyle="bold" />
-
-    <TextView
-        android:id="@+id/widget_arrival"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="07:39 着"
-        android:textColor="#FFFFFF"
-        android:textSize="14sp" />
+        android:orientation="vertical" />
 
 </LinearLayout>

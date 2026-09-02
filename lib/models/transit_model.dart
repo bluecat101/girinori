@@ -9,10 +9,10 @@ class TransitSegment {
 
   TransitSegment({
     required this.line,
-    required this.departureStation,
-    required this.duration,
-    required this.arrivalStation,
-    this.walkTimeAfter = 0,
+    required this.departureStation, // 区間の出発駅を保持する変数
+    required this.duration, // 区間の所要時間（分）を保持する変数
+    required this.arrivalStation, // 区間の到着駅を保持する変数
+    this.walkTimeAfter = 0, // 区間の到着駅から次の区間までの徒歩時間（分）を保持する変数
   });
 }
 

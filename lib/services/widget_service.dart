@@ -5,13 +5,11 @@ class WidgetService {
 
   static Future<void> update({
     required String route,
-    required String departure,
-    required String arrival,
+    required List<Map<String, String?>> stations,
   }) async {
     await _channel.invokeMethod('updateWidget', {
       'route': route,
-      'departure': departure,
-      'arrival': arrival,
+      'stations': stations,
     });
   }
 }

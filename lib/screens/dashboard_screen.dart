@@ -76,11 +76,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       _isLoading = false;
     });
-    await WidgetService.update(
-      route: '横浜 → 桜木町',
-      departure: formatTime(TimeOfDay.now()),
-      arrival: formatTime(TimeOfDay.now()),
-    );
   }
 
   void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
@@ -151,6 +146,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
       _isLoading = false;
     });
+    // widgetを更新
+    await _updateWidgetForRoute(newRoute);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
@@ -190,6 +187,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       _isLoading = false;
     });
+    await _updateWidgetForRoute(updatedRoute);
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -210,6 +208,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
           onPressed: _addRoute,
         ),
       ],
+    );
+  }
+
+  Future<void> _updateWidgetForRoute(TransitRoute route) async {
+    final now = DateTime.now();
+    final timetables = _timetableController.cachedTimetables
+        .map<String, Map<int, List<int>>>((lineId, timetable) {
+          return MapEntry(lineId, (timetable as Map<int, List<int>>));
+        });
+
+    final result = route.calculate(now, timetables);
+    if (result == null) {
+      return;
+    }
+
+    final stations = <Map<String, String?>>[];
+
+    for (int i = 0; i < route.segments.length; i++) {
+      final segment = route.segments[i];
+      final segmentResult = result.segmentResults[i];
+
+      // 最初の駅
+      if (i == 0) {
+        stations.add({
+          'station': segment.departureStation,
+          'arrival': null,
+          'departure': formatTime(TimeOfDay.fromDateTime(segmentResult.dep)),
+        });
+      }
+
+      // 区間の到着駅
+      stations.add({
+        'station': segment.arrivalStation,
+        'arrival': formatTime(TimeOfDay.fromDateTime(segmentResult.arr)),
+        'departure': null,
+      });
+
+      // 次の区間があるなら、その到着駅は次の出発駅でもある
+      if (i < route.segments.length - 1) {
+        final nextResult = result.segmentResults[i + 1];
+
+        stations[stations.length - 1]['departure'] = formatTime(
+          TimeOfDay.fromDateTime(nextResult.dep),
+        );
+      }
+    }
+
+    await WidgetService.update(
+      route: route.segments.isEmpty
+          ? route.name
+          : '${route.segments.first.departureStation} → '
+                '${route.segments.last.arrivalStation}',
+      stations: stations,
     );
   }
 }
