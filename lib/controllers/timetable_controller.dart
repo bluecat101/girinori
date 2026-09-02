@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:girinori/models/trip_model.dart';
 
 class TrainDayRange {
   final int firstTrain;
@@ -11,7 +12,7 @@ class TrainDayRange {
 }
 
 class _TrainCandidate {
-  final Map<String, dynamic> trip;
+  final Trip trip;
   final int departureMinutes;
   final int arrivalMinutes;
 
@@ -111,7 +112,9 @@ class TimetableController {
       final Map<String, dynamic> lineData = jsonDecode(jsonString);
 
       if (lineData['trips'] is List) {
-        cachedTimetables[lineId] = List<dynamic>.from(lineData['trips']);
+        cachedTimetables[lineId] = (lineData['trips'] as List)
+            .map((trip) => Trip.fromJson(Map<String, dynamic>.from(trip)))
+            .toList();
       }
       // 始発・終電を作成
       _buildTrainDayRanges(lineId: lineId, trips: cachedTimetables[lineId]!);
@@ -250,11 +253,8 @@ class TimetableController {
         if (rawTrip['day_type'] != dayType) {
           continue;
         }
-        final trip = rawTrip as Map<String, dynamic>;
-        final stopTimes = trip['stop_times'];
-        if (stopTimes is! Map<String, dynamic>) {
-          continue;
-        }
+        final trip = rawTrip as Trip;
+        final stopTimes = trip.stopTimes;
 
         final depTiming = stopTimes[departureStation];
         final arrTiming = stopTimes[arrivalStation];
@@ -262,8 +262,8 @@ class TimetableController {
           continue;
         }
 
-        final int? depMin = depTiming['dep'] ?? depTiming['arr'];
-        final int? arrMin = arrTiming['arr'] ?? arrTiming['dep'];
+        final int? depMin = depTiming.dep ?? depTiming.arr;
+        final int? arrMin = arrTiming.arr ?? arrTiming.dep;
         if (depMin == null || arrMin == null) {
           continue;
         }
