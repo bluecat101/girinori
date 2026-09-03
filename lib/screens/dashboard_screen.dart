@@ -4,7 +4,6 @@ import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
 import 'package:girinori/services/widget_service.dart';
-import 'package:girinori/utils/format_time.dart';
 import 'package:girinori/widgets/dashboard/route_page_view.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -162,6 +161,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _editRoute(int index) async {
+    print("edit");
     final updatedRoute = await Navigator.push<TransitRoute>(
       context,
       MaterialPageRoute(
@@ -212,55 +212,106 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _updateWidgetForRoute(TransitRoute route) async {
-    final now = DateTime.now();
-    final timetables = _timetableController.cachedTimetables
-        .map<String, Map<int, List<int>>>((lineId, timetable) {
-          return MapEntry(lineId, (timetable as Map<int, List<int>>));
-        });
+    print("Updating widget for route: ${route.name}");
 
-    final result = route.calculate(now, timetables);
-    if (result == null) {
+    if (route.segments.isEmpty) {
+      await WidgetService.update(route: 'ルートを指定してください。', stations: []);
       return;
     }
 
-    final stations = <Map<String, String?>>[];
+    final now = DateTime.now();
+
+    final result = _fetchAllDepArrTimes(
+      route.segments,
+      _timetableController,
+      now,
+    );
+
+    final stations = <WidgetStation>[];
 
     for (int i = 0; i < route.segments.length; i++) {
       final segment = route.segments[i];
-      final segmentResult = result.segmentResults[i];
+      final segmentResult = result[i];
 
       // 最初の駅
       if (i == 0) {
-        stations.add({
-          'station': segment.departureStation,
-          'arrival': null,
-          'departure': formatTime(TimeOfDay.fromDateTime(segmentResult.dep)),
-        });
+        stations.add(
+          WidgetStation(
+            station: segment.departureStation,
+            departure: segmentResult.dep,
+          ),
+        );
       }
 
-      // 区間の到着駅
-      stations.add({
-        'station': segment.arrivalStation,
-        'arrival': formatTime(TimeOfDay.fromDateTime(segmentResult.arr)),
-        'departure': null,
-      });
+      // 到着駅
+      stations.add(
+        WidgetStation(
+          station: segment.arrivalStation,
+          arrival: segmentResult.arr,
+        ),
+      );
 
-      // 次の区間があるなら、その到着駅は次の出発駅でもある
+      // 次の区間がある場合、この駅は乗換駅なので出発時刻も設定
       if (i < route.segments.length - 1) {
-        final nextResult = result.segmentResults[i + 1];
+        final nextResult = result[i + 1];
 
-        stations[stations.length - 1]['departure'] = formatTime(
-          TimeOfDay.fromDateTime(nextResult.dep),
+        stations[stations.length - 1] = WidgetStation(
+          station: segment.arrivalStation,
+          arrival: segmentResult.arr,
+          departure: nextResult.dep,
         );
       }
     }
 
     await WidgetService.update(
-      route: route.segments.isEmpty
-          ? route.name
-          : '${route.segments.first.departureStation} → '
-                '${route.segments.last.arrivalStation}',
+      route:
+          '${route.segments.first.departureStation} → '
+          '${route.segments.last.arrivalStation}',
       stations: stations,
     );
+  }
+
+  List<SegmentResult> _fetchAllDepArrTimes(
+    List<TransitSegment> segments,
+    TimetableController timetableController,
+    DateTime now,
+  ) {
+    final results = <SegmentResult>[];
+
+    TimeOfDay runningTime = TimeOfDay(hour: now.hour, minute: now.minute);
+
+    for (final segment in segments) {
+      final (depTimeOfDay, arrTimeOfDay) = timetableController
+          .findNextTrainTimes(
+            lineId: segment.line,
+            departureStation: segment.departureStation,
+            arrivalStation: segment.arrivalStation,
+            baseTime: runningTime,
+            shiftCount: 0,
+          );
+      final dep = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        depTimeOfDay.hour,
+        depTimeOfDay.minute,
+      );
+      final arr = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        arrTimeOfDay.hour,
+        arrTimeOfDay.minute,
+      );
+      results.add(SegmentResult(dep: dep, arr: arr));
+
+      // 次の区間は「到着＋徒歩時間」から検索
+      runningTime = timetableController.addMinutes(
+        arrTimeOfDay,
+        segment.walkTimeAfter,
+      );
+    }
+
+    return results;
   }
 }
