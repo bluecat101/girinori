@@ -28,7 +28,6 @@ class MainActivity : FlutterActivity() {
                     val stations =
                         call.argument<List<Map<String, String?>>>("stations")
                             ?: emptyList()
-
                     val stationsJson = JSONArray().apply {
                         stations.forEach { station ->
                             put(

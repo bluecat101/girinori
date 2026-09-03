@@ -66,11 +66,11 @@ class RouteWidgetProvider : AppWidgetProvider() {
             )
 
             // -----------------------------------------
-            // 駅一覧コンテナを取得
+            // 駅情報をクリア
             // -----------------------------------------
-            val stations = views.apply {
-                // 何もしない
-            }
+            views.removeAllViews(
+                R.id.widget_station_container
+            )
 
             // -----------------------------------------
             // 駅情報をJSONから取得
