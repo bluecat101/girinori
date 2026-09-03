@@ -43,6 +43,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
   final TimetableController _timetableController = TimetableController();
+  final now = DateTime.now();
   @override
   void initState() {
     super.initState();
@@ -66,9 +67,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
     }
-    final now = DateTime.now();
     for (final route in myRoutes) {
-      _routeBaseTimes[route.id] = TimeOfDay(hour: now.hour, minute: now.minute);
+      _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
     }
     setState(() {
       myLoadedRouteMaster = _timetableController.routeMaster;
@@ -136,13 +136,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         await _timetableController.loadTimetableFileForLine(segment.line);
       }
     }
-    final now = DateTime.now();
     setState(() {
       myRoutes.add(newRoute);
-      _routeBaseTimes[newRoute.id] = TimeOfDay(
-        hour: now.hour,
-        minute: now.minute,
-      );
+      _routeBaseTimes[newRoute.id] = TimeOfDay.fromDateTime(now);
       _isLoading = false;
     });
     // widgetを更新
@@ -219,13 +215,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       return;
     }
 
-    final now = DateTime.now();
-
-    final result = _fetchAllDepArrTimes(
-      route.segments,
-      _timetableController,
-      now,
-    );
+    final result = _fetchAllDepArrTimes(route.segments, _timetableController);
 
     final stations = <WidgetStation>[];
 
@@ -274,42 +264,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<SegmentResult> _fetchAllDepArrTimes(
     List<TransitSegment> segments,
     TimetableController timetableController,
-    DateTime now,
   ) {
     final results = <SegmentResult>[];
-
-    TimeOfDay runningTime = TimeOfDay(hour: now.hour, minute: now.minute);
+    TimeOfDay baseTime = TimeOfDay.fromDateTime(now);
 
     for (final segment in segments) {
-      final (depTimeOfDay, arrTimeOfDay) = timetableController
-          .findNextTrainTimes(
-            lineId: segment.line,
-            departureStation: segment.departureStation,
-            arrivalStation: segment.arrivalStation,
-            baseTime: runningTime,
-            shiftCount: 0,
-          );
-      final dep = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        depTimeOfDay.hour,
-        depTimeOfDay.minute,
-      );
-      final arr = DateTime(
-        now.year,
-        now.month,
-        now.day,
-        arrTimeOfDay.hour,
-        arrTimeOfDay.minute,
+      final (dep, arr) = timetableController.findNextTrainTimes(
+        lineId: segment.line,
+        departureStation: segment.departureStation,
+        arrivalStation: segment.arrivalStation,
+        baseTime: baseTime,
+        shiftCount: 0,
       );
       results.add(SegmentResult(dep: dep, arr: arr));
 
       // 次の区間は「到着＋徒歩時間」から検索
-      runningTime = timetableController.addMinutes(
-        arrTimeOfDay,
-        segment.walkTimeAfter,
-      );
+      baseTime = timetableController.addMinutes(arr, segment.walkTimeAfter);
     }
 
     return results;

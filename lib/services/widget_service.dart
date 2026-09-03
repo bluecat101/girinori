@@ -1,11 +1,17 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class WidgetStation {
   final String station;
-  final DateTime? arrival;
-  final DateTime? departure;
+  final TimeOfDay? arrival;
+  final TimeOfDay? departure;
 
   WidgetStation({required this.station, this.arrival, this.departure});
+}
+
+String formatTimeOfDay(TimeOfDay time) {
+  return '${time.hour.toString().padLeft(2, '0')}:'
+      '${time.minute.toString().padLeft(2, '0')}';
 }
 
 class WidgetService {
@@ -19,8 +25,12 @@ class WidgetService {
     final stationData = stations.map((station) {
       return <String, String?>{
         'station': station.station,
-        'arrival': station.arrival?.toIso8601String(),
-        'departure': station.departure?.toIso8601String(),
+        'arrival': station.arrival != null
+            ? formatTimeOfDay(station.arrival!)
+            : null,
+        'departure': station.departure != null
+            ? formatTimeOfDay(station.departure!)
+            : null,
       };
     }).toList();
 

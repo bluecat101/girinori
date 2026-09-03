@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 class TransitSegment {
   String line;
   String departureStation;
@@ -23,8 +25,8 @@ class TransitRoute {
 }
 
 class SegmentResult {
-  final DateTime dep;
-  final DateTime arr;
+  final TimeOfDay dep;
+  final TimeOfDay arr;
   SegmentResult({required this.dep, required this.arr});
 }
 
