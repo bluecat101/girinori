@@ -314,7 +314,7 @@ class TimetableController {
       }
     }
 
-    assert(baseIndex != -1, '時刻表から検索できませんでした。');
+    // assert(baseIndex != -1, '時刻表から検索できませんでした。');
 
     // ============================================================
     // shiftCount

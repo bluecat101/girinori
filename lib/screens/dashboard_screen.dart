@@ -19,7 +19,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _isLoading = true; // 駅マスタと初期ルートのファイル読み込み管理フラグ
 
-  // お気に入りルート
+  // 💡 Widgetに表示するルートIDを保持する変数
   String? widgetRouteId;
 
   // 💡 ユーザーが登録したルートのリスト（prefixがクローラー仕様の日本語になっています）
@@ -115,10 +115,40 @@ class _DashboardScreenState extends State<DashboardScreen> {
               segmentShiftCounts: _segmentShiftCounts,
               pageController: _pageController,
               timetableController: _timetableController,
-              onEditRoute: _editRoute,
+              onRouteMenu: _showRouteMenu,
               onShiftTrain: _shiftTrainCount,
+              widgetRouteId: widgetRouteId,
             ),
     );
+  }
+
+  void _showRouteMenu(BuildContext context, int index, bool isWidgetRoute) {
+    final route = myRoutes[index];
+
+    showMenu(
+      context: context,
+      position: const RelativeRect.fromLTRB(100, 200, 100, 200),
+      items: [
+        PopupMenuItem(value: 'edit', child: const Text('編集')),
+        PopupMenuItem(value: 'delete', child: const Text('削除')),
+        PopupMenuItem(
+          value: 'widget',
+          child: Text(isWidgetRoute ? 'Widgetに非表示' : 'Widgetに表示'),
+        ),
+      ],
+    ).then((value) {
+      switch (value) {
+        case 'edit':
+          _editRoute(index);
+          break;
+        case 'delete':
+          _deleteRoute(route);
+          break;
+        case 'widget':
+          _setWidgetRoute(route);
+          break;
+      }
+    });
   }
 
   Future<void> _addRoute() async {
@@ -208,6 +238,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _deleteRoute(TransitRoute route) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('ルートを削除'),
+          content: Text('「${route.name}」を削除しますか？'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, false);
+              },
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, true);
+              },
+              child: const Text('削除'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    setState(() {
+      myRoutes.removeWhere((item) => item.id == route.id);
+    });
+  }
+
+  Future<void> _setWidgetRoute(TransitRoute route) async {
+    setState(() {
+      if (route.id == widgetRouteId) {
+        widgetRouteId = null; // すでにWidgetに表示されている場合は非表示にする
+      } else {
+        widgetRouteId = route.id; // Widgetに表示するルートを設定
+      }
+    });
+
+    await _updateWidgetForRoute();
   }
 
   Future<void> _updateWidgetForRoute() async {
