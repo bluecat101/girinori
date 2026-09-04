@@ -4,49 +4,30 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:minHeight="28dp"
+    android:minHeight="24dp"
     android:orientation="horizontal"
     android:gravity="center_vertical">
 
-    <!-- 到着時刻 -->
-
-    <TextView
-        android:id="@+id/station_arrival"
-        android:layout_width="48dp"
-        android:layout_height="wrap_content"
-        android:gravity="end"
-        android:textColor="#FFFFFF"
-        android:textSize="11sp" />
-
-    <!-- 縦線 -->
-
-    <TextView
-        android:id="@+id/station_line"
-        android:layout_width="18dp"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="│"
-        android:textColor="#777777"
-        android:textSize="14sp" />
-
-    <!-- ● 駅名 -->
-
+    <!-- 駅名・路線図 -->
     <TextView
         android:id="@+id/station_name"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_weight="1"
+        android:gravity="center_vertical"
         android:textColor="#FFFFFF"
-        android:textSize="12sp" />
+        android:textSize="11sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
 
-    <!-- 出発時刻 -->
-
+    <!-- 時刻 -->
     <TextView
-        android:id="@+id/station_departure"
-        android:layout_width="48dp"
+        android:id="@+id/station_time"
+        android:layout_width="82dp"
         android:layout_height="wrap_content"
-        android:gravity="start"
-        android:textColor="#00E676"
-        android:textSize="11sp" />
+        android:gravity="end|center_vertical"
+        android:textColor="#FFFFFF"
+        android:textSize="9sp"
+        android:singleLine="true" />
 
 </LinearLayout>

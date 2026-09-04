@@ -105,69 +105,109 @@ class RouteWidgetProvider : AppWidgetProvider() {
                     context.packageName,
                     R.layout.widget_station_row
                 )
+            // -----------------------------------------
+            // 駅名
+            // -----------------------------------------
 
-                // -----------------------------------------
-                // 駅名
-                // -----------------------------------------
-                row.setTextViewText(
-                    R.id.station_name,
+            val stationText = when {
+                i == 0 -> {
                     "● $stationName"
-                )
+                }
 
-                // -----------------------------------------
-                // 到着時刻
-                // -----------------------------------------
-                if (arrival.isNotEmpty()) {
-                    row.setTextViewText(
-                        R.id.station_arrival,
-                        "$arrival 着"
+                i == stationArray.length() - 1 -> {
+                    "● $stationName"
+                }
+
+                else -> {
+                    "├─ $stationName"
+                }
+            }
+
+            row.setTextViewText(
+                R.id.station_name,
+                stationText
+            )
+            // -----------------------------------------
+            // 駅名・時刻の色
+            // -----------------------------------------
+
+            when {
+                i == 0 -> {
+                    // 出発駅
+                    row.setTextColor(
+                        R.id.station_name,
+                        android.graphics.Color.rgb(80, 170, 255)
                     )
-                } else {
-                    row.setTextViewText(
-                        R.id.station_arrival,
-                        ""
+
+                    row.setTextColor(
+                        R.id.station_time,
+                        android.graphics.Color.rgb(80, 170, 255)
                     )
                 }
 
-                // -----------------------------------------
-                // 出発時刻
-                // -----------------------------------------
-                if (departure.isNotEmpty()) {
-                    row.setTextViewText(
-                        R.id.station_departure,
-                        "$departure 発"
+                i == stationArray.length() - 1 -> {
+                    // 到着駅
+                    row.setTextColor(
+                        R.id.station_name,
+                        android.graphics.Color.rgb(0, 230, 118)
                     )
-                } else {
-                    row.setTextViewText(
-                        R.id.station_departure,
-                        ""
+
+                    row.setTextColor(
+                        R.id.station_time,
+                        android.graphics.Color.rgb(0, 230, 118)
                     )
                 }
 
-                // -----------------------------------------
-                // 縦線
-                //
-                // 最初と最後の駅には線を表示しない
-                // -----------------------------------------
-                if (i == 0 || i == stationArray.length() - 1) {
-                    row.setTextViewText(
-                        R.id.station_line,
-                        ""
+                else -> {
+                    // 経由駅
+                    row.setTextColor(
+                        R.id.station_name,
+                        android.graphics.Color.WHITE
                     )
-                } else {
-                    row.setTextViewText(
-                        R.id.station_line,
-                        "│"
+
+                    row.setTextColor(
+                        R.id.station_time,
+                        android.graphics.Color.LTGRAY
                     )
                 }
+            }
 
-                // -----------------------------------------
-                // 駅行をWidgetに追加
-                // -----------------------------------------
-                views.addView(
-                    R.id.widget_station_container,
-                    row
-                )
+            // -----------------------------------------
+            // 時刻
+            // -----------------------------------------
+
+            val timeText = when {
+                arrival.isNotEmpty() && departure.isNotEmpty() -> {
+                    "$arrival 着 → $departure 発"
+                }
+
+                arrival.isNotEmpty() -> {
+                    "$arrival 着"
+                }
+
+                departure.isNotEmpty() -> {
+                    "$departure 発"
+                }
+
+                else -> {
+                    ""
+                }
+            }
+
+            row.setTextViewText(
+                R.id.station_time,
+                timeText
+            )
+
+            // -----------------------------------------
+            // 駅行をWidgetに追加
+            // -----------------------------------------
+
+            views.addView(
+                R.id.widget_station_container,
+                row
+            )
+
             }
             // -----------------------------------------
             // Widgetをタップしたときにアプリを起動するIntentを設定
