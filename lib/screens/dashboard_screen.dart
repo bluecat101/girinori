@@ -19,6 +19,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _isLoading = true; // 駅マスタと初期ルートのファイル読み込み管理フラグ
 
+  // お気に入りルート
+  String? widgetRouteId;
+
   // 💡 ユーザーが登録したルートのリスト（prefixがクローラー仕様の日本語になっています）
   List<TransitRoute> myRoutes = [
     TransitRoute(
@@ -142,7 +145,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = false;
     });
     // widgetを更新
-    await _updateWidgetForRoute(newRoute);
+    await _updateWidgetForRoute();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
 
@@ -183,7 +186,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
       _isLoading = false;
     });
-    await _updateWidgetForRoute(updatedRoute);
+    await _updateWidgetForRoute();
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -207,11 +210,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Future<void> _updateWidgetForRoute(TransitRoute route) async {
-    print("Updating widget for route: ${route.name}");
+  Future<void> _updateWidgetForRoute() async {
+    final TransitRoute route;
+    final noRoutesMessage = 'ルートを指定してください。';
+    if (myRoutes.isEmpty) {
+      await WidgetService.update(route: noRoutesMessage, stations: []);
+      return;
+    }
+
+    if (widgetRouteId == null) {
+      route = myRoutes.first;
+    } else {
+      route = myRoutes.firstWhere(
+        (route) => route.id == widgetRouteId,
+        orElse: () => myRoutes.first,
+      );
+    }
 
     if (route.segments.isEmpty) {
-      await WidgetService.update(route: 'ルートを指定してください。', stations: []);
+      await WidgetService.update(route: noRoutesMessage, stations: []);
       return;
     }
 
