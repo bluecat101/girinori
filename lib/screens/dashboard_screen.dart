@@ -23,21 +23,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? widgetRouteId;
 
   // 💡 ユーザーが登録したルートのリスト（prefixがクローラー仕様の日本語になっています）
-  List<TransitRoute> myRoutes = [
-    TransitRoute(
-      id: "route_1",
-      name: "根岸線・大宮方面",
-      segments: [
-        TransitSegment(
-          departureStation: "大船",
-          line: "ＪＲ根岸線_大宮・南浦和方面", // 👈 クローラーのprefix（ファイル名）と完全一致させる
-          duration: 15,
-          arrivalStation: "磯子",
-          walkTimeAfter: 0,
-        ),
-      ],
-    ),
-  ];
+  List<TransitRoute> myRoutes = [];
 
   final Map<String, TimeOfDay> _routeBaseTimes = {};
   // どのルートのどの区間が何本シフトしているかを保存するマップ
@@ -190,7 +176,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _editRoute(int index) async {
-    print("edit");
     final updatedRoute = await Navigator.push<TransitRoute>(
       context,
       MaterialPageRoute(
