@@ -33,13 +33,14 @@ class RouteTimelineCard extends StatelessWidget {
       // この区間のシフト数のキーを作成して取得する
       final shiftKey = '${route.id}_$i';
       final shiftCount = segmentShiftCounts[shiftKey] ?? 0;
-      final (dep, arr) = timetableController.findNextTrainTimes(
-        lineId: segment.line,
-        departureStation: segment.departureStation,
-        arrivalStation: segment.arrivalStation,
-        baseTime: runningTime,
-        shiftCount: shiftCount,
-      );
+      final (TimeOfDay dep, TimeOfDay arr) = timetableController
+          .findNextTrainTimesByLineName(
+            lineName: segment.lineName,
+            departureStation: segment.departureStation,
+            arrivalStation: segment.arrivalStation,
+            baseTime: runningTime,
+            shiftCount: shiftCount,
+          );
 
       departureTimes.add(dep);
       arrivalTimes.add(arr);
@@ -104,7 +105,7 @@ class RouteTimelineCard extends StatelessWidget {
                           onShiftTrain(i, isNext);
                         },
                       ),
-                      LineRow(lineName: route.segments[i].line),
+                      LineRow(lineName: route.segments[i].lineName),
                     ],
                     // 到着駅を表示する
                     DashboardStationRow(

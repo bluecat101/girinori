@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 class RouteLineNode extends StatelessWidget {
   final int segmentIndex;
-  final List<String> availableLines;
-  final String? selectedLine;
+  final List<String> availableLineNames;
+  final String? selectedLineName;
   final ValueChanged<String?> onChanged;
   const RouteLineNode({
     super.key,
     required this.segmentIndex,
-    required this.availableLines,
-    required this.selectedLine,
+    required this.availableLineNames,
+    required this.selectedLineName,
     required this.onChanged,
   });
 
@@ -47,14 +47,16 @@ class RouteLineNode extends StatelessWidget {
             child: DropdownButtonFormField<String>(
               // タブ切り替えや候補変更時に
               // Dropdownの状態をリフレッシュ
-              key: ValueKey('line_${segmentIndex}_${availableLines.length}'),
+              key: ValueKey(
+                'line_${segmentIndex}_${availableLineNames.length}',
+              ),
 
-              value: availableLines.contains(selectedLine)
-                  ? selectedLine
+              value: availableLineNames.contains(selectedLineName)
+                  ? selectedLineName
                   : null,
 
               hint: Text(
-                availableLines.isEmpty ? '前後の駅名を確認してください' : '利用路線を選択',
+                availableLineNames.isEmpty ? '前後の駅名を確認してください' : '利用路線を選択',
 
                 style: const TextStyle(fontSize: 13, color: Colors.grey),
               ),
@@ -69,11 +71,11 @@ class RouteLineNode extends StatelessWidget {
                 ),
               ),
 
-              items: availableLines.map((String line) {
+              items: availableLineNames.map((String lineName) {
                 return DropdownMenuItem<String>(
-                  value: line,
+                  value: lineName,
                   child: Text(
-                    line,
+                    lineName,
                     style: const TextStyle(fontSize: 14, color: Colors.white),
                   ),
                 );

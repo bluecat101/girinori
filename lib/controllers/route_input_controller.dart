@@ -6,7 +6,7 @@ class RouteInputData {
   final TextEditingController nameController;
   final List<TextEditingController> viaStationControllers = [];
   final List<TextEditingController> walkTimeControllers = [];
-  final List<String?> selectedLines = [];
+  final List<String?> selectedLineNames = [];
 
   RouteInputData({required String defaultName})
     : nameController = TextEditingController(text: defaultName);
@@ -83,12 +83,12 @@ class RouteInputController {
     for (int i = 0; i < route.segments.length; i++) {
       final segment = route.segments[i];
       if (i == 0) {
-        inputData.selectedLines.add(segment.line);
+        inputData.selectedLineNames.add(segment.lineName);
       } else {
         inputData.viaStationControllers.add(
           TextEditingController(text: segment.departureStation),
         );
-        inputData.selectedLines.add(segment.line);
+        inputData.selectedLineNames.add(segment.lineName);
       }
       if (i < route.segments.length - 1) {
         inputData.walkTimeControllers.add(
@@ -109,7 +109,7 @@ class RouteInputController {
     formKey = GlobalKey<FormState>();
     final route = RouteInputData(defaultName: 'ルート 1');
     // 最初の区間の路線選択欄を用意する
-    route.selectedLines.add(null);
+    route.selectedLineNames.add(null);
     this.route = route;
   }
 
@@ -121,7 +121,7 @@ class RouteInputController {
     final route = currentRoute;
     route.viaStationControllers.add(TextEditingController());
     route.walkTimeControllers.add(TextEditingController(text: '3'));
-    route.selectedLines.add(null);
+    route.selectedLineNames.add(null);
   }
 
   // ============================================================
@@ -138,15 +138,15 @@ class RouteInputController {
     route.viaStationControllers.removeAt(viaIndex);
     route.walkTimeControllers.removeAt(viaIndex);
     // 経由駅を1つ削除すると、その駅に対応する路線を削除
-    if (viaIndex + 1 < route.selectedLines.length) {
-      route.selectedLines.removeAt(viaIndex + 1);
+    if (viaIndex + 1 < route.selectedLineNames.length) {
+      route.selectedLineNames.removeAt(viaIndex + 1);
     }
   }
 
   List<String> getAvailableLines(int segmentIndex) {
     final route = currentRoute;
     // 範囲チェック
-    if (segmentIndex < 0 || segmentIndex >= route.selectedLines.length) {
+    if (segmentIndex < 0 || segmentIndex >= route.selectedLineNames.length) {
       return [];
     }
 
@@ -168,7 +168,7 @@ class RouteInputController {
     }
 
     final String arrStation;
-    if (segmentIndex == route.selectedLines.length - 1) {
+    if (segmentIndex == route.selectedLineNames.length - 1) {
       arrStation = arrivalController.text.trim();
     } else {
       if (segmentIndex >= viaCount) {
@@ -197,18 +197,13 @@ class RouteInputController {
   // ============================================================
   // 路線選択
   // ============================================================
-  void selectLine(int segmentIndex, String? line) {
+  void selectLine(int segmentIndex, String? lineName) {
     final route = currentRoute;
-    if (segmentIndex < 0 || segmentIndex >= route.selectedLines.length) {
+    if (segmentIndex < 0 || segmentIndex >= route.selectedLineNames.length) {
       return;
     }
 
-    final availableLines = getAvailableLines(segmentIndex);
-    if (line != null && !availableLines.contains(line)) {
-      route.selectedLines[segmentIndex] = null;
-      return;
-    }
-    route.selectedLines[segmentIndex] = line;
+    route.selectedLineNames[segmentIndex] = lineName;
   }
 
   // ============================================================
@@ -218,13 +213,12 @@ class RouteInputController {
     final route = currentRoute;
 
     final segments = <TransitSegment>[];
-
-    for (int i = 0; i < route.selectedLines.length; i++) {
+    for (int i = 0; i < route.selectedLineNames.length; i++) {
       final departureStation = i == 0
           ? departureController.text.trim()
           : route.viaStationControllers[i - 1].text.trim();
 
-      final arrivalStation = i == route.selectedLines.length - 1
+      final arrivalStation = i == route.selectedLineNames.length - 1
           ? arrivalController.text.trim()
           : route.viaStationControllers[i].text.trim();
 
@@ -235,7 +229,7 @@ class RouteInputController {
       segments.add(
         TransitSegment(
           departureStation: departureStation,
-          line: route.selectedLines[i] ?? '',
+          lineName: route.selectedLineNames[i] ?? '',
           duration: 15,
           arrivalStation: arrivalStation,
           walkTimeAfter: walkTime,
@@ -281,10 +275,10 @@ class RouteInputController {
   String? getSelectedLine(int segmentIndex) {
     final route = currentRoute;
 
-    if (segmentIndex < 0 || segmentIndex >= route.selectedLines.length) {
+    if (segmentIndex < 0 || segmentIndex >= route.selectedLineNames.length) {
       return null;
     }
 
-    return route.selectedLines[segmentIndex];
+    return route.selectedLineNames[segmentIndex];
   }
 }

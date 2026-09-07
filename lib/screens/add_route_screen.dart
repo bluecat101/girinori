@@ -122,8 +122,10 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           builder: (context, _, child) {
                             return RouteLineNode(
                               segmentIndex: i,
-                              availableLines: _controller.getAvailableLines(i),
-                              selectedLine: _controller.getSelectedLine(i),
+                              availableLineNames: _extractUniqueLineNames(
+                                _controller.getAvailableLines(i),
+                              ),
+                              selectedLineName: _controller.getSelectedLine(i),
                               onChanged: (newValue) {
                                 _controller.selectLine(i, newValue);
                               },
@@ -177,8 +179,6 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                       return;
                     }
 
-                    // List<TransitRoute> results = _controller.compileAllRoutes();
-                    // Navigator.pop(context, results);
                     final result = _controller.compileRoute();
                     Navigator.pop(context, result);
                   },
@@ -196,6 +196,16 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         ),
       ),
     );
+  }
+
+  List<String> _extractUniqueLineNames(List<String> fullLineNames) {
+    return fullLineNames
+        .map((fullLineName) {
+          final lineName = fullLineName.split('_').first;
+          return lineName;
+        })
+        .toSet()
+        .toList();
   }
 
   Widget _buildAddStepButton() {

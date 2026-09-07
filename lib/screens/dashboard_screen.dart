@@ -51,8 +51,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _timetableController.loadTimetableIndex();
     for (final route in myRoutes) {
       for (final segment in route.segments) {
-        if (segment.line.isNotEmpty) {
-          await _timetableController.loadTimetableFileForLine(segment.line);
+        if (segment.lineName.isNotEmpty) {
+          await _timetableController.loadTimetableFileFormLineName(
+            segment.lineName,
+          );
         }
       }
     }
@@ -151,8 +153,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in newRoute.segments) {
-      if (segment.line.isNotEmpty) {
-        await _timetableController.loadTimetableFileForLine(segment.line);
+      if (segment.lineName.isNotEmpty) {
+        await _timetableController.loadTimetableFileFormLineName(
+          segment.lineName,
+        );
       }
     }
     setState(() {
@@ -192,8 +196,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in updatedRoute.segments) {
-      if (segment.line.isNotEmpty) {
-        await _timetableController.loadTimetableFileForLine(segment.line);
+      if (segment.lineName.isNotEmpty) {
+        await _timetableController.loadTimetableFileFormLineName(
+          segment.lineName,
+        );
       }
     }
     setState(() {
@@ -347,8 +353,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     TimeOfDay baseTime = TimeOfDay.fromDateTime(now);
 
     for (final segment in segments) {
-      final (dep, arr) = timetableController.findNextTrainTimes(
-        lineId: segment.line,
+      final (dep, arr) = timetableController.findNextTrainTimesByLineName(
+        lineName: segment.lineName,
         departureStation: segment.departureStation,
         arrivalStation: segment.arrivalStation,
         baseTime: baseTime,

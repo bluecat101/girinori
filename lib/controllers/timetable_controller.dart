@@ -94,15 +94,38 @@ class TimetableController {
     );
   }
 
-  Future<void> loadTimetableFileForLine(String lineId) async {
-    if (cachedTimetables.containsKey(lineId)) {
+  /// ============================================================
+  /// 路線時刻表読み込み(From 路線名)
+  /// ============================================================
+  Future<void> loadTimetableFileFormLineName(String lineName) async {
+    final lineNames = _getLinesByLineName(
+      timetableFileMap.keys.toList(),
+      lineName,
+    );
+    for (final line in lineNames) {
+      await _loadTimetableFileForLine(line);
+    }
+  }
+
+  /// ============================================================
+  /// 路線名から路線IDを取得する
+  /// ============================================================
+  List<String> _getLinesByLineName(List<String> lines, String lineName) {
+    return lines.where((line) => line.startsWith('${lineName}_')).toList();
+  }
+
+  // ============================================================
+  // 路線時刻表読み込み(From 路線ID)
+  // ============================================================
+  Future<void> _loadTimetableFileForLine(String lineName) async {
+    if (cachedTimetables.containsKey(lineName)) {
       return;
     }
 
-    final fileName = timetableFileMap[lineId];
+    final fileName = timetableFileMap[lineName];
 
     if (fileName == null) {
-      debugPrint('❌ timetable file not found: $lineId');
+      debugPrint('❌ timetable file not found: $lineName');
       return;
     }
 
@@ -112,14 +135,17 @@ class TimetableController {
       final Map<String, dynamic> lineData = jsonDecode(jsonString);
 
       if (lineData['trips'] is List) {
-        cachedTimetables[lineId] = (lineData['trips'] as List)
+        cachedTimetables[lineName] = (lineData['trips'] as List)
             .map((trip) => Trip.fromJson(Map<String, dynamic>.from(trip)))
             .toList();
       }
       // 始発・終電を作成
-      _buildTrainDayRanges(lineId: lineId, trips: cachedTimetables[lineId]!);
+      _buildTrainDayRanges(
+        lineId: lineName,
+        trips: cachedTimetables[lineName]!,
+      );
     } catch (e) {
-      debugPrint('❌ 路線ファイル [$lineId] のロード失敗: $e');
+      debugPrint('❌ 路線ファイル [$lineName] のロード失敗: $e');
     }
   }
 
@@ -189,6 +215,44 @@ class TimetableController {
     }
 
     return 'weekday';
+  }
+
+  (TimeOfDay, TimeOfDay) findNextTrainTimesByLineName({
+    required String lineName,
+    required String departureStation,
+    required String arrivalStation,
+    required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
+    int shiftCount = 0,
+  }) {
+    final depLineIds = routeMaster[departureStation]?.keys.toList();
+    if (depLineIds == null) {
+      return (baseTime, baseTime);
+    }
+    final lineIds = _getLinesByLineName(depLineIds, lineName);
+    if (lineIds.isEmpty) {
+      return (baseTime, baseTime);
+    }
+    TimeOfDay? earliestDeparture;
+    TimeOfDay? earliestArrival;
+    for (final lineId in lineIds) {
+      final (TimeOfDay dep, TimeOfDay arr) = findNextTrainTimes(
+        lineId: lineId,
+        departureStation: departureStation,
+        arrivalStation: arrivalStation,
+        baseTime: baseTime,
+        shiftCount: shiftCount,
+      );
+      if (dep != baseTime || arr != baseTime) {
+        if (earliestDeparture == null ||
+            dep.hour * 60 + dep.minute <
+                earliestDeparture.hour * 60 + earliestDeparture.minute) {
+          earliestDeparture = dep;
+          earliestArrival = arr;
+        }
+      }
+    }
+
+    return (earliestDeparture ?? baseTime, earliestArrival ?? baseTime);
   }
 
   (TimeOfDay, TimeOfDay) findNextTrainTimes({
