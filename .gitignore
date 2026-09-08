@@ -47,3 +47,4 @@ app.*.map.json
 assets/*
 !assets/.gitkeep
 !assets/route_master.json.example
+!assets/icon/icon.png
