@@ -51,9 +51,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _timetableController.loadTimetableIndex();
     for (final route in myRoutes) {
       for (final segment in route.segments) {
-        if (segment.lineName.isNotEmpty) {
+        if (segment.lineNames.isNotEmpty) {
           await _timetableController.loadTimetableFileFormLineName(
-            segment.lineName,
+            segment.lineNames, // 複数の路線がある場合は、最初の路線の時刻表をロードする
           );
         }
       }
@@ -153,9 +153,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in newRoute.segments) {
-      if (segment.lineName.isNotEmpty) {
+      if (segment.lineNames.isNotEmpty) {
         await _timetableController.loadTimetableFileFormLineName(
-          segment.lineName,
+          segment.lineNames,
         );
       }
     }
@@ -196,9 +196,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in updatedRoute.segments) {
-      if (segment.lineName.isNotEmpty) {
+      if (segment.lineNames.isNotEmpty) {
         await _timetableController.loadTimetableFileFormLineName(
-          segment.lineName,
+          segment.lineNames,
         );
       }
     }
@@ -353,8 +353,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     TimeOfDay baseTime = TimeOfDay.fromDateTime(now);
 
     for (final segment in segments) {
-      final (dep, arr) = timetableController.findNextTrainTimesByLineName(
-        lineName: segment.lineName,
+      final (dep, arr) = timetableController.findNextTrainTimesByLineNames(
+        lineNames: segment.lineNames,
         departureStation: segment.departureStation,
         arrivalStation: segment.arrivalStation,
         baseTime: baseTime,

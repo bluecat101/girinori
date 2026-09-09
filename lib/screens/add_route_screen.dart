@@ -122,12 +122,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           builder: (context, _, child) {
                             return RouteLineNode(
                               segmentIndex: i,
-                              availableLineNames: _extractUniqueLineNames(
-                                _controller.getAvailableLines(i),
-                              ),
-                              selectedLineName: _controller.getSelectedLine(i),
+                              availableLineNames: _controller
+                                  .getAvailableLineNames(i),
+                              selectedLineNames: _controller
+                                  .getSelectedLineNames(i),
                               onChanged: (newValue) {
                                 _controller.selectLine(i, newValue);
+                                setState(() {});
                               },
                             );
                           },

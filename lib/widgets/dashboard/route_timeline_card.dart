@@ -34,8 +34,8 @@ class RouteTimelineCard extends StatelessWidget {
       final shiftKey = '${route.id}_$i';
       final shiftCount = segmentShiftCounts[shiftKey] ?? 0;
       final (TimeOfDay dep, TimeOfDay arr) = timetableController
-          .findNextTrainTimesByLineName(
-            lineName: segment.lineName,
+          .findNextTrainTimesByLineNames(
+            lineNames: segment.lineNames,
             departureStation: segment.departureStation,
             arrivalStation: segment.arrivalStation,
             baseTime: runningTime,
@@ -105,7 +105,7 @@ class RouteTimelineCard extends StatelessWidget {
                           onShiftTrain(i, isNext);
                         },
                       ),
-                      LineRow(lineName: route.segments[i].lineName),
+                      LineRow(lineNames: route.segments[i].lineNames),
                     ],
                     // 到着駅を表示する
                     DashboardStationRow(
