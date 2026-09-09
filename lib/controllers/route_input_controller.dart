@@ -272,12 +272,17 @@ class RouteInputController {
 
   List<String> getSelectedLineNames(int segmentIndex) {
     final route = currentRoute;
-
     if (segmentIndex < 0 || segmentIndex >= route.selectedLineNames.length) {
       return [];
     }
-
     return route.selectedLineNames[segmentIndex];
+  }
+
+  void removeSelectedLines(int segmentIndex) {
+    final availableLineNames = getAvailableLineNames(segmentIndex);
+    final selectedLineNames = getSelectedLineNames(segmentIndex);
+
+    selectedLineNames.removeWhere((line) => !availableLineNames.contains(line));
   }
 
   List<String> _extractUniqueLineNames(List<String> fullLineNames) {
