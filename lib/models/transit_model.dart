@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 class TransitSegment {
-  String lineName;
+  List<String> lineNames;
   String departureStation;
   int duration;
   String arrivalStation;
   int walkTimeAfter;
 
   TransitSegment({
-    required this.lineName,
+    required this.lineNames, // 区間の路線名を保持する変数（複数の路線が存在する場合があるため、List<String>型）
     required this.departureStation, // 区間の出発駅を保持する変数
     required this.duration, // 区間の所要時間（分）を保持する変数
     required this.arrivalStation, // 区間の到着駅を保持する変数

@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 
 class LineRow extends StatelessWidget {
-  final String lineName;
+  final List<String> lineNames;
 
-  const LineRow({super.key, required this.lineName});
+  const LineRow({super.key, required this.lineNames});
 
   @override
   Widget build(BuildContext context) {
-    // 画面表示用に prefix
-    // 「ＪＲ根岸線_大宮・南浦和方面」→「ＪＲ根岸線」
-    final cleanName = lineName.split('_')[0];
+    // 表示する路線名
+    final cleanName = lineNames.isNotEmpty ? lineNames.first.split('_')[0] : '';
+
+    // 複数の路線がある場合は「...」を追加
+    final displayName = lineNames.length > 1 ? '$cleanName...' : cleanName;
 
     return Row(
       children: [
@@ -24,7 +26,7 @@ class LineRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            cleanName,
+            displayName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(

@@ -108,6 +108,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           _controller.getStationController(i).text = station;
                           setState(() {});
                         },
+                        onStationConfirmed: (station) {
+                          final segmentIndex = i - 1;
+                          if (segmentIndex >= 0) {
+                            _controller.removeSelectedLines(segmentIndex);
+                            setState(() {});
+                          }
+                        },
                         onRemove: i > 0 && i < _controller.totalNodes - 1
                             ? () {
                                 setState(() {
@@ -122,12 +129,13 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           builder: (context, _, child) {
                             return RouteLineNode(
                               segmentIndex: i,
-                              availableLineNames: _extractUniqueLineNames(
-                                _controller.getAvailableLines(i),
-                              ),
-                              selectedLineName: _controller.getSelectedLine(i),
+                              availableLineNames: _controller
+                                  .getAvailableLineNames(i),
+                              selectedLineNames: _controller
+                                  .getSelectedLineNames(i),
                               onChanged: (newValue) {
                                 _controller.selectLine(i, newValue);
+                                setState(() {});
                               },
                             );
                           },
@@ -196,16 +204,6 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
         ),
       ),
     );
-  }
-
-  List<String> _extractUniqueLineNames(List<String> fullLineNames) {
-    return fullLineNames
-        .map((fullLineName) {
-          final lineName = fullLineName.split('_').first;
-          return lineName;
-        })
-        .toSet()
-        .toList();
   }
 
   Widget _buildAddStepButton() {

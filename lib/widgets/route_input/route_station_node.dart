@@ -22,6 +22,9 @@ class RouteStationNode extends StatelessWidget {
   /// 駅名候補が選択されたとき
   final ValueChanged<String> onStationSelected;
 
+  /// 駅名が確定されたとき（フォーカスが外れたとき）
+  final ValueChanged<String> onStationConfirmed;
+
   /// 経由駅を削除
   final VoidCallback? onRemove;
 
@@ -35,6 +38,7 @@ class RouteStationNode extends StatelessWidget {
     required this.stationNames,
     required this.onStationChanged,
     required this.onStationSelected,
+    required this.onStationConfirmed,
     this.onRemove,
   });
 
@@ -44,7 +48,6 @@ class RouteStationNode extends StatelessWidget {
     final Color themeColor = isStart
         ? const Color(0xFF00E676)
         : (isEnd ? Colors.redAccent : const Color(0xFF00B0FF));
-
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -81,7 +84,8 @@ class RouteStationNode extends StatelessWidget {
         Expanded(
           flex: 4,
           child: Autocomplete<String>(
-            key: ValueKey('auto_${nodeIndex}_${stationController.text}'),
+            // key: ValueKey('auto_${nodeIndex}_${stationController.text}'),
+            key: ValueKey('auto_$nodeIndex'),
             optionsBuilder: (TextEditingValue textEditingValue) {
               if (textEditingValue.text.isEmpty) {
                 return const Iterable<String>.empty();
@@ -96,44 +100,57 @@ class RouteStationNode extends StatelessWidget {
             },
             fieldViewBuilder:
                 (context, textController, focusNode, onFieldSubmitted) {
-                  // 画面表示時・再構築時に
-                  // 親から渡されたControllerの値を同期
-                  if (textController.text != stationController.text) {
-                    textController.value = stationController.value;
-                  }
-                  return TextFormField(
-                    controller: textController,
-                    focusNode: focusNode,
-                    style: const TextStyle(fontSize: 14, color: Colors.white),
-                    onChanged: (value) {
-                      onStationChanged(value);
-                    },
-                    decoration: InputDecoration(
-                      labelText: label,
-                      hintText: '駅名を入力',
-                      labelStyle: const TextStyle(color: Colors.grey),
-                      hintStyle: const TextStyle(color: Colors.white30),
-                      filled: true,
-                      fillColor: const Color(0xFF121214),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: themeColor),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return '必須';
+                  // 画面表示時・再構築時に親から渡されたControllerの値を同期し、初期値を入力設定
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (textController.text != stationController.text) {
+                      textController.value = stationController.value;
+                    }
+                  });
+                  return Focus(
+                    onFocusChange: (hasFocus) {
+                      if (!hasFocus) {
+                        // フォーカスが外れた = 駅名入力が一旦確定
+                        onStationConfirmed(textController.text);
                       }
-                      return null;
                     },
+                    child: TextFormField(
+                      controller: textController,
+                      focusNode: focusNode,
+                      style: const TextStyle(fontSize: 14, color: Colors.white),
+                      onChanged: (value) {
+                        onStationChanged(value);
+                      },
+                      onFieldSubmitted: (value) {
+                        // Enterキーで確定
+                        onStationConfirmed(value);
+                      },
+                      decoration: InputDecoration(
+                        labelText: label,
+                        hintText: '駅名を入力',
+                        labelStyle: const TextStyle(color: Colors.grey),
+                        hintStyle: const TextStyle(color: Colors.white30),
+                        filled: true,
+                        fillColor: const Color(0xFF121214),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: themeColor),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return '必須';
+                        }
+                        return null;
+                      },
+                    ),
                   );
                 },
 

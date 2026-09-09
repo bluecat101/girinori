@@ -97,14 +97,33 @@ class TimetableController {
   /// ============================================================
   /// 路線時刻表読み込み(From 路線名)
   /// ============================================================
-  Future<void> loadTimetableFileFormLineName(String lineName) async {
-    final lineNames = _getLinesByLineName(
-      timetableFileMap.keys.toList(),
-      lineName,
-    );
-    for (final line in lineNames) {
+  Future<void> loadTimetableFileFormLineName(List<String> lineNames) async {
+    final allLineNames = <String>{};
+    for (final lineName in lineNames) {
+      final foundLines = _getLinesByLineName(
+        timetableFileMap.keys.toList(),
+        lineName,
+      );
+      allLineNames.addAll(foundLines);
+    }
+    for (final line in allLineNames) {
       await _loadTimetableFileForLine(line);
     }
+  }
+
+  /// ============================================================
+  /// 複数の路線名から、全ての路線IDを取得する
+  /// ============================================================
+  List<String> _getAllLineIdsByLineNames(
+    List<String> lines,
+    List<String> lineNames,
+  ) {
+    final allLineIds = <String>{};
+    for (final lineName in lineNames) {
+      final foundLines = _getLinesByLineName(lines, lineName);
+      allLineIds.addAll(foundLines);
+    }
+    return allLineIds.toList();
   }
 
   /// ============================================================
@@ -217,8 +236,8 @@ class TimetableController {
     return 'weekday';
   }
 
-  (TimeOfDay, TimeOfDay) findNextTrainTimesByLineName({
-    required String lineName,
+  (TimeOfDay, TimeOfDay) findNextTrainTimesByLineNames({
+    required List<String> lineNames,
     required String departureStation,
     required String arrivalStation,
     required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
@@ -228,7 +247,7 @@ class TimetableController {
     if (depLineIds == null) {
       return (baseTime, baseTime);
     }
-    final lineIds = _getLinesByLineName(depLineIds, lineName);
+    final lineIds = _getAllLineIdsByLineNames(depLineIds, lineNames);
     if (lineIds.isEmpty) {
       return (baseTime, baseTime);
     }
