@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
+import 'package:girinori/services/file_storage.dart';
 import 'package:girinori/services/widget_service.dart';
 import 'package:girinori/widgets/dashboard/route_page_view.dart';
 
@@ -49,23 +50,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initializeData() async {
     await _timetableController.loadRouteMasterFile();
     await _timetableController.loadTimetableIndex();
-    for (final route in myRoutes) {
-      for (final segment in route.segments) {
-        if (segment.lineNames.isNotEmpty) {
-          await _timetableController.loadTimetableFileFormLineName(
-            segment.lineNames, // 複数の路線がある場合は、最初の路線の時刻表をロードする
-          );
-        }
+    if (myRoutes.isEmpty) {
+      final json = await FileStorage().load();
+      if (json == null) {
+        _isLoading = false;
+        return;
       }
+      widgetRouteId = json['widgetRouteId'];
+      final routes = json["routes"] as List<dynamic>;
+      // JSONからTransitRouteのリストに変換
+      final data = routes.map((route) => TransitRoute.fromJson(route)).toList();
+      _initRoutes(data);
     }
-    for (final route in myRoutes) {
-      _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
-    }
-    setState(() {
-      myLoadedRouteMaster = _timetableController.routeMaster;
-
-      _isLoading = false;
-    });
+    _isLoading = false;
   }
 
   void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
@@ -87,6 +84,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
     }
+    print("====DashBoardScreen build called====");
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
       appBar: _buildAppBar(),
@@ -139,6 +137,36 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  Future<void> _initRoutes(List<TransitRoute> routes) async {
+    for (final route in routes) {
+      for (final segment in route.segments) {
+        if (segment.lineNames.isNotEmpty) {
+          await _timetableController.loadTimetableFileFormLineName(
+            segment.lineNames,
+          );
+        }
+      }
+      setState(() {
+        myRoutes.add(route);
+        _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
+      });
+    }
+
+    // widgetを更新
+    await _updateWidgetForRoute();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          myRoutes.length - 1,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   Future<void> _addRoute() async {
     final newRoute = await Navigator.push<TransitRoute>(
       context,
@@ -177,6 +205,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         );
       }
     });
+    _saveRouteToStorage();
   }
 
   Future<void> _editRoute(int index) async {
@@ -208,6 +237,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = false;
     });
     await _updateWidgetForRoute();
+    _saveRouteToStorage();
   }
 
   PreferredSizeWidget _buildAppBar() {
@@ -275,6 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
 
     await _updateWidgetForRoute();
+    _saveRouteToStorage();
   }
 
   Future<void> _updateWidgetForRoute() async {
@@ -367,5 +398,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return results;
+  }
+
+  void _saveRouteToStorage() async {
+    final routeData = {
+      'routes': myRoutes.map((route) => route.toJson()).toList(),
+      'widgetRouteId': widgetRouteId,
+    };
+
+    await FileStorage().save(routeData);
   }
 }
