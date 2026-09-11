@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/route_input_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
@@ -52,17 +53,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _timetableController.loadTimetableIndex();
     if (myRoutes.isEmpty) {
       final json = await FileStorage().load();
-      if (json == null) {
-        _isLoading = false;
-        return;
+      if (json != null) {
+        widgetRouteId = json['widgetRouteId'];
+        final routes = json["routes"] as List<dynamic>;
+        // JSONからTransitRouteのリストに変換
+        final data = routes
+            .map((route) => TransitRoute.fromJson(route))
+            .toList();
+        await _initRoutes(data);
       }
-      widgetRouteId = json['widgetRouteId'];
-      final routes = json["routes"] as List<dynamic>;
-      // JSONからTransitRouteのリストに変換
-      final data = routes.map((route) => TransitRoute.fromJson(route)).toList();
-      _initRoutes(data);
     }
-    _isLoading = false;
+
+    setState(() {
+      myLoadedRouteMaster = _timetableController.routeMaster;
+      _isLoading = false;
+    });
   }
 
   void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
@@ -84,7 +89,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       );
     }
-    print("====DashBoardScreen build called====");
     return Scaffold(
       backgroundColor: const Color(0xFF121214),
       appBar: _buildAppBar(),
@@ -146,10 +150,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           );
         }
       }
-      setState(() {
-        myRoutes.add(route);
-        _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
-      });
+      myRoutes.add(route);
+      _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
     }
 
     // widgetを更新
