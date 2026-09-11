@@ -1,6 +1,5 @@
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
-import 'package:girinori/controllers/route_input_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/screens/add_route_screen.dart';
@@ -295,6 +294,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       myRoutes.removeWhere((item) => item.id == route.id);
     });
+    _saveRouteToStorage();
   }
 
   Future<void> _setWidgetRoute(TransitRoute route) async {
