@@ -1,11 +1,14 @@
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
+import 'package:girinori/models/route_master_model.dart';
 import 'package:girinori/models/transit_model.dart';
+import 'package:girinori/providers/route_master_provider.dart';
 import 'package:girinori/screens/add_route_screen.dart';
 import 'package:girinori/services/file_storage.dart';
 import 'package:girinori/services/widget_service.dart';
 import 'package:girinori/widgets/dashboard/route_page_view.dart';
+import 'package:provider/provider.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -16,7 +19,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   // 💡 【新設計】クローラーが作った駅マスタを保持する変数
-  Map<String, Map<String, List<dynamic>>> myLoadedRouteMaster = {};
+  RouteMaster get routeMaster {
+    return context.read<RouteMasterProvider>().routeMaster;
+  }
 
   bool _isLoading = true; // 駅マスタと初期ルートのファイル読み込み管理フラグ
 
@@ -32,7 +37,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final Map<String, int> _segmentShiftCounts = {};
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
-  final TimetableController _timetableController = TimetableController();
+  late final TimetableController _timetableController;
   final now = DateTime.now();
   @override
   void initState() {
@@ -48,7 +53,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _initializeData() async {
-    await _timetableController.loadRouteMasterFile();
+    _timetableController = TimetableController(routeMaster: routeMaster);
     await _timetableController.loadTimetableIndex();
     if (myRoutes.isEmpty) {
       final json = await FileStorage().load();
@@ -64,7 +69,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     setState(() {
-      myLoadedRouteMaster = _timetableController.routeMaster;
       _isLoading = false;
     });
   }
@@ -172,7 +176,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final newRoute = await Navigator.push<TransitRoute>(
       context,
       MaterialPageRoute(
-        builder: (context) => AddRouteScreen(routeMaster: myLoadedRouteMaster),
+        builder: (context) => AddRouteScreen(routeMaster: routeMaster),
       ),
     );
     if (newRoute == null) {
@@ -214,7 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context,
       MaterialPageRoute(
         builder: (context) => AddRouteScreen(
-          routeMaster: myLoadedRouteMaster,
+          routeMaster: routeMaster,
           editingRoute: myRoutes[index],
         ),
       ),

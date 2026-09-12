@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-// 新しく作成したダッシュボード画面をインポート
 import 'package:girinori/screens/dashboard_screen.dart';
+import 'package:girinori/providers/route_master_provider.dart';
 
 void main() {
-  runApp(const MyTransitApp());
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => RouteMasterProvider(),
+      child: const MyTransitApp(),
+    ),
+    // const MyTransitApp()
+  );
 }
 
 class MyTransitApp extends StatelessWidget {
