@@ -175,9 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _addRoute() async {
     final newRoute = await Navigator.push<TransitRoute>(
       context,
-      MaterialPageRoute(
-        builder: (context) => AddRouteScreen(routeMaster: routeMaster),
-      ),
+      MaterialPageRoute(builder: (context) => AddRouteScreen()),
     );
     if (newRoute == null) {
       return;
@@ -217,10 +215,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final updatedRoute = await Navigator.push<TransitRoute>(
       context,
       MaterialPageRoute(
-        builder: (context) => AddRouteScreen(
-          routeMaster: routeMaster,
-          editingRoute: myRoutes[index],
-        ),
+        builder: (context) => AddRouteScreen(editingRoute: myRoutes[index]),
       ),
     );
     if (updatedRoute == null) {
