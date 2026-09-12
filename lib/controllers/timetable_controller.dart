@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:girinori/models/route_master_model.dart';
 import 'package:girinori/models/trip_model.dart';
 
 class TrainDayRange {
@@ -24,9 +25,12 @@ class _TrainCandidate {
 }
 
 class TimetableController {
+  TimetableController({required this.routeMaster});
+
   /// 駅マスタ
-  /// {駅名: {路線ID: [停車駅リスト]}}のマップ
-  Map<String, Map<String, List<dynamic>>> routeMaster = {};
+  final RouteMaster routeMaster;
+
+  // Map<String, Map<String, List<dynamic>>> routeMaster = {};
 
   /// 路線ごとの時刻表キャッシュ
   /// {路線ID: List< Trip >}のマップ
@@ -46,40 +50,6 @@ class TimetableController {
   bool get hasNextTimeTable => _hasNextTimeTable;
   bool get hasPreviousTimeTable => _hasPreviousTimeTable;
 
-  // ============================================================
-  // 駅マスタ読み込み
-  // ============================================================
-
-  Future<void> loadRouteMasterFile() async {
-    try {
-      final jsonString = await rootBundle.loadString(
-        'assets/route_master.json',
-      );
-
-      final Map<String, dynamic> rawMap = jsonDecode(jsonString);
-      final formattedMaster = <String, Map<String, List<dynamic>>>{};
-      rawMap.forEach((station, routes) {
-        final routeMap = <String, List<dynamic>>{};
-        if (routes is Map<String, dynamic>) {
-          routes.forEach((lineId, stopStations) {
-            if (stopStations is List) {
-              routeMap[lineId] = stopStations;
-            }
-          });
-        }
-        formattedMaster[station] = routeMap;
-      });
-      routeMaster = formattedMaster;
-      debugPrint(
-        '🚀 駅マスタのロード成功'
-        '（${routeMaster.length}駅）',
-      );
-    } catch (e) {
-      debugPrint('❌ 駅マスタのロード失敗: $e');
-    }
-  }
-
-  // ============================================================
   // 路線時刻表インデックス読み込み
   // ============================================================
   Future<void> loadTimetableIndex() async {

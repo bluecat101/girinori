@@ -1,24 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:girinori/controllers/route_input_controller.dart';
+import 'package:girinori/models/route_master_model.dart';
 import 'package:girinori/models/transit_model.dart';
+import 'package:girinori/providers/route_master_provider.dart';
 import 'package:girinori/widgets/route_input/route_station_node.dart';
 import 'package:girinori/widgets/route_line_node.dart';
+import 'package:provider/provider.dart';
 
 class AddRouteScreen extends StatefulWidget {
-  final Map<String, Map<String, List<dynamic>>> routeMaster;
   final TransitRoute? editingRoute;
 
-  const AddRouteScreen({
-    super.key,
-    required this.routeMaster,
-    this.editingRoute,
-  });
+  const AddRouteScreen({super.key, this.editingRoute});
 
   @override
   State<AddRouteScreen> createState() => _AddRouteScreenState();
 }
 
 class _AddRouteScreenState extends State<AddRouteScreen> {
+  RouteMaster get routeMaster =>
+      context.read<RouteMasterProvider>().routeMaster;
   // 💡 共通のFormStateではなく、ルートごとに独立したFormKeyを持つことで全裏ルートを一括バリデーションする
   late final RouteInputController _controller;
   final ScrollController _routeTabScrollController = ScrollController();
@@ -28,7 +28,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   void initState() {
     super.initState();
     _controller = RouteInputController(
-      routeMaster: widget.routeMaster,
+      routeMaster: routeMaster,
       editingRoute: widget.editingRoute,
     );
   }
@@ -99,7 +99,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                         walkTimeController: _controller.getWalkTimeController(
                           i,
                         ),
-                        stationNames: widget.routeMaster.keys,
+                        stationNames: routeMaster.keys,
                         onStationChanged: (value) {
                           _controller.getStationController(i).text = value;
                           _stationChangeNotifier.value++;

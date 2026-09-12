@@ -14,6 +14,25 @@ class TransitSegment {
     required this.arrivalStation, // 区間の到着駅を保持する変数
     this.walkTimeAfter = 0, // 区間の到着駅から次の区間までの徒歩時間（分）を保持する変数
   });
+  Map<String, dynamic> toJson() {
+    return {
+      'lineNames': lineNames,
+      'departureStation': departureStation,
+      'duration': duration,
+      'arrivalStation': arrivalStation,
+      'walkTimeAfter': walkTimeAfter,
+    };
+  }
+
+  factory TransitSegment.fromJson(Map<String, dynamic> json) {
+    return TransitSegment(
+      lineNames: List<String>.from(json['lineNames']),
+      departureStation: json['departureStation'],
+      duration: json['duration'],
+      arrivalStation: json['arrivalStation'],
+      walkTimeAfter: json['walkTimeAfter'] ?? 0,
+    );
+  }
 }
 
 class TransitRoute {
@@ -22,6 +41,24 @@ class TransitRoute {
   final List<TransitSegment> segments;
 
   TransitRoute({required this.id, required this.name, required this.segments});
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'segments': segments.map((segment) => segment.toJson()).toList(),
+    };
+  }
+
+  factory TransitRoute.fromJson(Map<String, dynamic> json) {
+    return TransitRoute(
+      id: json['id'],
+      name: json['name'],
+      segments: (json['segments'] as List<dynamic>)
+          .map((segmentJson) => TransitSegment.fromJson(segmentJson))
+          .toList(),
+    );
+  }
 }
 
 class SegmentResult {
