@@ -8,12 +8,10 @@ class RouteMasterProvider extends ChangeNotifier {
   RouteMaster _routeMaster = {};
 
   RouteMaster get routeMaster => _routeMaster;
-
   // ============================================================
   // 駅マスタ読み込み
   // ============================================================
-
-  Future<void> loadRouteMasterFile() async {
+  Future<void> load() async {
     try {
       final jsonString = await rootBundle.loadString(
         'assets/route_master.json',
@@ -32,11 +30,10 @@ class RouteMasterProvider extends ChangeNotifier {
         }
         formattedMaster[station] = routeMap;
       });
-      final routeMaster = formattedMaster;
-      debugPrint(
-        '🚀 駅マスタのロード成功'
-        '（${routeMaster.length}駅）',
-      );
+
+      // ★ Providerが保持している値を更新
+      _routeMaster = formattedMaster;
+      debugPrint('🚀 駅マスタのロード成功（${_routeMaster.length}駅）');
     } catch (e) {
       debugPrint('❌ 駅マスタのロード失敗: $e');
     } finally {

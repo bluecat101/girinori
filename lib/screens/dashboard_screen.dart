@@ -53,6 +53,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Future<void> _initializeData() async {
+    await context.read<RouteMasterProvider>().load();
+    print('DashboardScreen: _initializeData() called');
+    print("RouteMaster: ${routeMaster.length} routes loaded");
     _timetableController = TimetableController(routeMaster: routeMaster);
     await _timetableController.loadTimetableIndex();
     if (myRoutes.isEmpty) {
