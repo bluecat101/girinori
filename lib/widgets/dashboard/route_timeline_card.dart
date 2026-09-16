@@ -72,7 +72,7 @@ class RouteTimelineCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              "${formatTime(arrivalTimes.last)} 着",
+              "${formatTime(departureTimes.first)} -> ${formatTime(arrivalTimes.last)} 着",
               style: const TextStyle(
                 color: Color(0xFF00E676),
                 fontWeight: FontWeight.bold,
