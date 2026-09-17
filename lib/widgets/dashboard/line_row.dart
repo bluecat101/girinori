@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 
 class LineRow extends StatelessWidget {
   final List<String> lineNames;
+  final Color lineColor;
 
-  const LineRow({super.key, required this.lineNames});
+  const LineRow({super.key, required this.lineNames, required this.lineColor});
 
   @override
   Widget build(BuildContext context) {
@@ -20,7 +21,7 @@ class LineRow extends StatelessWidget {
           child: Container(
             width: 1,
             height: 16,
-            color: const Color(0xFF00B0FF).withOpacity(0.5),
+            color: lineColor.withOpacity(0.5),
           ),
         ),
         const SizedBox(width: 12),
@@ -29,8 +30,8 @@ class LineRow extends StatelessWidget {
             displayName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF00B0FF),
+            style: TextStyle(
+              color: lineColor,
               fontSize: 9,
               fontWeight: FontWeight.w500,
             ),

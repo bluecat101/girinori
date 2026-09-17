@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/widgets/dashboard/route_timeline_card.dart';
@@ -9,6 +10,7 @@ class RoutePageView extends StatelessWidget {
   final Map<String, int> segmentShiftCounts;
   final PageController pageController;
   final TimetableController timetableController;
+  final LineController lineController;
   final String? widgetRouteId;
 
   final void Function(BuildContext context, int index, bool isWidgetRoute)
@@ -24,6 +26,7 @@ class RoutePageView extends StatelessWidget {
     required this.segmentShiftCounts,
     required this.pageController,
     required this.timetableController,
+    required this.lineController,
     required this.onRouteMenu,
     required this.onShiftTrain,
     required this.widgetRouteId,
@@ -51,6 +54,7 @@ class RoutePageView extends StatelessWidget {
                     route: route,
                     baseTime: routeBaseTimes[route.id] ?? TimeOfDay.now(),
                     timetableController: timetableController,
+                    lineController: lineController,
                     segmentShiftCounts: segmentShiftCounts,
                     onShiftTrain: (segmentIndex, isNext) {
                       onShiftTrain(route.id, segmentIndex, isNext);

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/route_master_model.dart';
 import 'package:girinori/models/transit_model.dart';
@@ -38,6 +39,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
   late final TimetableController _timetableController;
+  late final LineController _lineController;
   final now = DateTime.now();
   @override
   void initState() {
@@ -54,10 +56,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _initializeData() async {
     await context.read<RouteMasterProvider>().load();
-    print('DashboardScreen: _initializeData() called');
-    print("RouteMaster: ${routeMaster.length} routes loaded");
     _timetableController = TimetableController(routeMaster: routeMaster);
+    _lineController = LineController();
     await _timetableController.loadTimetableIndex();
+    await _lineController.init();
     if (myRoutes.isEmpty) {
       final json = await FileStorage().load();
       if (json != null) {
@@ -111,6 +113,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               segmentShiftCounts: _segmentShiftCounts,
               pageController: _pageController,
               timetableController: _timetableController,
+              lineController: _lineController,
               onRouteMenu: _showRouteMenu,
               onShiftTrain: _shiftTrainCount,
               widgetRouteId: widgetRouteId,

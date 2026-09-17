@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/utils/format_time.dart';
@@ -10,6 +11,7 @@ class RouteTimelineCard extends StatelessWidget {
   final TransitRoute route;
   final TimeOfDay baseTime;
   final TimetableController timetableController;
+  final LineController lineController;
   final Map<String, int> segmentShiftCounts;
   final void Function(int segmentIndex, bool isNext) onShiftTrain;
 
@@ -18,6 +20,7 @@ class RouteTimelineCard extends StatelessWidget {
     required this.route,
     required this.baseTime,
     required this.timetableController,
+    required this.lineController,
     required this.segmentShiftCounts,
     required this.onShiftTrain,
   });
@@ -105,7 +108,12 @@ class RouteTimelineCard extends StatelessWidget {
                           onShiftTrain(i, isNext);
                         },
                       ),
-                      LineRow(lineNames: route.segments[i].lineNames),
+                      LineRow(
+                        lineNames: route.segments[i].lineNames,
+                        lineColor: lineController.lineColor(
+                          route.segments[i].lineNames.first,
+                        ),
+                      ),
                     ],
                     // 到着駅を表示する
                     DashboardStationRow(
