@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:girinori/models/route_master_model.dart';
+import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/models/trip_model.dart';
 
 class TrainDayRange {
@@ -206,7 +207,7 @@ class TimetableController {
     return 'weekday';
   }
 
-  (TimeOfDay, TimeOfDay) findNextTrainTimesByLineNames({
+  SegmentResult findNextTrainTimesByLineNames({
     required List<String> lineNames,
     required String departureStation,
     required String arrivalStation,
@@ -215,14 +216,23 @@ class TimetableController {
   }) {
     final depLineIds = routeMaster[departureStation]?.keys.toList();
     if (depLineIds == null) {
-      return (baseTime, baseTime);
+      return SegmentResult(
+        dep: baseTime,
+        arr: baseTime,
+        lineName: lineNames.first,
+      );
     }
     final lineIds = _getAllLineIdsByLineNames(depLineIds, lineNames);
     if (lineIds.isEmpty) {
-      return (baseTime, baseTime);
+      return SegmentResult(
+        dep: baseTime,
+        arr: baseTime,
+        lineName: lineNames.first,
+      );
     }
     TimeOfDay? earliestDeparture;
     TimeOfDay? earliestArrival;
+    String earliestLineId = '';
     for (final lineId in lineIds) {
       final (TimeOfDay dep, TimeOfDay arr) = findNextTrainTimes(
         lineId: lineId,
@@ -236,12 +246,17 @@ class TimetableController {
             dep.hour * 60 + dep.minute <
                 earliestDeparture.hour * 60 + earliestDeparture.minute) {
           earliestDeparture = dep;
+          earliestLineId = lineId;
           earliestArrival = arr;
         }
       }
     }
 
-    return (earliestDeparture ?? baseTime, earliestArrival ?? baseTime);
+    return SegmentResult(
+      dep: earliestDeparture ?? baseTime,
+      arr: earliestArrival ?? baseTime,
+      lineName: earliestLineId,
+    );
   }
 
   (TimeOfDay, TimeOfDay) findNextTrainTimes({

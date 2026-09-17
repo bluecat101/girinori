@@ -64,11 +64,12 @@ class TransitRoute {
 class SegmentResult {
   final TimeOfDay dep;
   final TimeOfDay arr;
-  SegmentResult({required this.dep, required this.arr});
+  final String lineName;
+  SegmentResult({required this.dep, required this.arr, this.lineName = ''});
 }
 
-class RouteResult {
-  final List<SegmentResult> segmentResults;
-  final int countdownMinutes;
-  RouteResult({required this.segmentResults, required this.countdownMinutes});
-}
+// class RouteResult {
+//   final List<SegmentResult> segmentResults;
+//   final int countdownMinutes;
+//   RouteResult({required this.segmentResults, required this.countdownMinutes});
+// }

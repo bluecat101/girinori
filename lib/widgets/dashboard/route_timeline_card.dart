@@ -27,8 +27,10 @@ class RouteTimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 表示するための出発時刻、到着時刻、路線名を格納するリストを作成
     List<TimeOfDay> departureTimes = [];
     List<TimeOfDay> arrivalTimes = [];
+    List<String> lineNames = []; // 区間の路線名を格納するリスト
     TimeOfDay runningTime = baseTime;
 
     for (int i = 0; i < route.segments.length; i++) {
@@ -36,7 +38,7 @@ class RouteTimelineCard extends StatelessWidget {
       // この区間のシフト数のキーを作成して取得する
       final shiftKey = '${route.id}_$i';
       final shiftCount = segmentShiftCounts[shiftKey] ?? 0;
-      final (TimeOfDay dep, TimeOfDay arr) = timetableController
+      final SegmentResult segmentResult = timetableController
           .findNextTrainTimesByLineNames(
             lineNames: segment.lineNames,
             departureStation: segment.departureStation,
@@ -45,11 +47,15 @@ class RouteTimelineCard extends StatelessWidget {
             shiftCount: shiftCount,
           );
 
-      departureTimes.add(dep);
-      arrivalTimes.add(arr);
+      departureTimes.add(segmentResult.dep);
+      arrivalTimes.add(segmentResult.arr);
+      lineNames.add(segmentResult.lineName);
 
       // 次の乗り換えがある場合は、本物の到着時刻に徒歩時間を足す
-      runningTime = timetableController.addMinutes(arr, segment.walkTimeAfter);
+      runningTime = timetableController.addMinutes(
+        segmentResult.arr,
+        segment.walkTimeAfter,
+      );
     }
 
     return Container(
@@ -109,10 +115,8 @@ class RouteTimelineCard extends StatelessWidget {
                         },
                       ),
                       LineRow(
-                        lineNames: route.segments[i].lineNames,
-                        lineColor: lineController.lineColor(
-                          route.segments[i].lineNames.first,
-                        ),
+                        displayLineName: _formatLineName(lineNames, i),
+                        lineColor: lineController.lineColor(lineNames[i]),
                       ),
                     ],
                     // 到着駅を表示する
@@ -139,5 +143,15 @@ class RouteTimelineCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatLineName(List<String> lineNames, int index) {
+    // インデックスが範囲内かチェックするガード
+    if (index < 0 || index >= lineNames.length) {
+      return '';
+    }
+
+    // 複数の路線がある場合は名前の後ろに ' ... ' を付与する
+    return lineNames.length > 1 ? '${lineNames[index]} ... ' : lineNames[index];
   }
 }

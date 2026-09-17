@@ -396,17 +396,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     TimeOfDay baseTime = TimeOfDay.fromDateTime(now);
 
     for (final segment in segments) {
-      final (dep, arr) = timetableController.findNextTrainTimesByLineNames(
-        lineNames: segment.lineNames,
-        departureStation: segment.departureStation,
-        arrivalStation: segment.arrivalStation,
-        baseTime: baseTime,
-        shiftCount: 0,
-      );
-      results.add(SegmentResult(dep: dep, arr: arr));
+      final SegmentResult segmentResult = timetableController
+          .findNextTrainTimesByLineNames(
+            lineNames: segment.lineNames,
+            departureStation: segment.departureStation,
+            arrivalStation: segment.arrivalStation,
+            baseTime: baseTime,
+            shiftCount: 0,
+          );
+      results.add(segmentResult);
 
       // 次の区間は「到着＋徒歩時間」から検索
-      baseTime = timetableController.addMinutes(arr, segment.walkTimeAfter);
+      baseTime = timetableController.addMinutes(
+        segmentResult.arr,
+        segment.walkTimeAfter,
+      );
     }
 
     return results;
