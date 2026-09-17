@@ -46,13 +46,13 @@ class RoutePageView extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(left: 12.0, top: 4.0, bottom: 4.0),
             child: GestureDetector(
-              onTapDown: (details) {
-                onRouteMenu(
-                  details.globalPosition,
-                  index,
-                  widgetRouteId == route.id,
-                );
-              },
+              // onTapDown: (details) {
+              //   onRouteMenu(
+              //     details.globalPosition,
+              //     index,
+              //     widgetRouteId == route.id,
+              //   );
+              // },
               child: Stack(
                 children: [
                   RouteTimelineCard(
@@ -63,6 +63,13 @@ class RoutePageView extends StatelessWidget {
                     segmentShiftCounts: segmentShiftCounts,
                     onShiftTrain: (segmentIndex, isNext) {
                       onShiftTrain(route.id, segmentIndex, isNext);
+                    },
+                    onRouteMenu: (globalPosition) {
+                      onRouteMenu(
+                        globalPosition,
+                        index,
+                        widgetRouteId == route.id,
+                      );
                     },
                   ),
 

@@ -14,6 +14,7 @@ class RouteTimelineCard extends StatelessWidget {
   final LineController lineController;
   final Map<String, int> segmentShiftCounts;
   final void Function(int segmentIndex, bool isNext) onShiftTrain;
+  final void Function(Offset globalPosition) onRouteMenu;
 
   const RouteTimelineCard({
     super.key,
@@ -23,6 +24,7 @@ class RouteTimelineCard extends StatelessWidget {
     required this.lineController,
     required this.segmentShiftCounts,
     required this.onShiftTrain,
+    required this.onRouteMenu,
   });
 
   @override
@@ -69,17 +71,48 @@ class RouteTimelineCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              route.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            // Text(
+            //   route.name,
+            //   maxLines: 1,
+            //   overflow: TextOverflow.ellipsis,
+            //   style: const TextStyle(
+            //     fontSize: 14,
+            //     fontWeight: FontWeight.bold,
+            //     color: Colors.white,
+            //   ),
+            // ),
+            // const SizedBox(height: 4),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    route.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // 右側の三点リーダー（メニューボタン）
+                InkWell(
+                  onTapDown: (details) {
+                    onRouteMenu(details.globalPosition);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(
+                      Icons.more_vert, // 縦の三点リーダー
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
             Text(
               "${formatTime(departureTimes.first)} -> ${formatTime(arrivalTimes.last)} 着",
               style: const TextStyle(
