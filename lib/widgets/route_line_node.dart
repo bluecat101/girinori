@@ -5,6 +5,7 @@ class RouteLineNode extends StatelessWidget {
   final List<String> availableLineNames;
   final List<String> selectedLineNames;
   final ValueChanged<List<String>> onChanged;
+  final bool selectedLineValid;
 
   const RouteLineNode({
     super.key,
@@ -12,6 +13,7 @@ class RouteLineNode extends StatelessWidget {
     required this.availableLineNames,
     required this.selectedLineNames,
     required this.onChanged,
+    required this.selectedLineValid,
   });
 
   @override
@@ -119,18 +121,37 @@ class RouteLineNode extends StatelessWidget {
                     vertical: 4,
                   ),
                 ),
-                child: Text(
-                  availableLineNames.isEmpty
-                      ? '前後の駅名を確認してください'
-                      : selectedLineNames.isEmpty
-                      ? '利用路線を選択'
-                      : selectedLineNames.join('、'),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: selectedLineNames.isEmpty
-                        ? Colors.grey
-                        : Colors.white,
-                  ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min, // 必要な高さだけ使う
+                  children: [
+                    // 既存の選択テキスト
+                    Text(
+                      availableLineNames.isEmpty
+                          ? '前後の駅名を確認してください'
+                          : selectedLineNames.isEmpty
+                          ? '利用路線を選択'
+                          : selectedLineNames.join('、'),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: selectedLineNames.isEmpty
+                            ? Colors.grey
+                            : Colors.white,
+                      ),
+                    ),
+
+                    // エラー時（未選択かつ保存押下後）のみ中に「必須」を表示
+                    if (!selectedLineValid) ...[
+                      const SizedBox(height: 4), // テキストとの微小な隙間
+                      const Text(
+                        '必須',
+                        style: TextStyle(
+                          color: Color(0xFFB3261E),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
