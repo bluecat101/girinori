@@ -174,6 +174,11 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                     elevation: 0,
                   ),
                   onPressed: () {
+                    // ルート登録前にすべての区間の路線選択をリセットしてバリデーションをやり直す
+                    for (int i = 0; i < _controller.totalNodes - 1; i++) {
+                      _controller.removeSelectedLines(i);
+                    }
+
                     // 💡 【改善④】すべてのルート（非表示含む）のバリデーションを一括チェック
                     bool allValid = true;
                     if (!_controller.formKey.currentState!.validate()) {
