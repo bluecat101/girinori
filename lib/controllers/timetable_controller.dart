@@ -214,25 +214,22 @@ class TimetableController {
     required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
     int shiftCount = 0,
   }) {
+    final defaultSegmentResult = SegmentResult(
+      dep: baseTime,
+      arr: baseTime,
+      lineName: '',
+    );
     final depLineIds = routeMaster[departureStation]?.keys.toList();
     if (depLineIds == null) {
-      return SegmentResult(
-        dep: baseTime,
-        arr: baseTime,
-        lineName: lineNames.first,
-      );
+      return defaultSegmentResult;
     }
     final lineIds = _getAllLineIdsByLineNames(depLineIds, lineNames);
     if (lineIds.isEmpty) {
-      return SegmentResult(
-        dep: baseTime,
-        arr: baseTime,
-        lineName: lineNames.first,
-      );
+      return defaultSegmentResult;
     }
     TimeOfDay? earliestDeparture;
     TimeOfDay? earliestArrival;
-    String earliestLineId = '';
+    String earliestLineName = '';
     for (final lineId in lineIds) {
       final (TimeOfDay dep, TimeOfDay arr) = findNextTrainTimes(
         lineId: lineId,
@@ -246,7 +243,7 @@ class TimetableController {
             dep.hour * 60 + dep.minute <
                 earliestDeparture.hour * 60 + earliestDeparture.minute) {
           earliestDeparture = dep;
-          earliestLineId = lineId;
+          earliestLineName = _extractUniqueLineName(lineId);
           earliestArrival = arr;
         }
       }
@@ -255,7 +252,7 @@ class TimetableController {
     return SegmentResult(
       dep: earliestDeparture ?? baseTime,
       arr: earliestArrival ?? baseTime,
-      lineName: earliestLineId,
+      lineName: earliestLineName,
     );
   }
 
@@ -418,5 +415,12 @@ class TimetableController {
   TimeOfDay addMinutes(TimeOfDay time, int minutes) {
     final total = time.hour * 60 + time.minute + minutes;
     return TimeOfDay(hour: (total ~/ 60) % 24, minute: total % 60);
+  }
+
+  /// ============================================================
+  /// 路線名からユニークな路線名を抽出する
+  /// ============================================================
+  String _extractUniqueLineName(String fullLineName) {
+    return fullLineName.split('_').first;
   }
 }
