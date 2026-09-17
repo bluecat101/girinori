@@ -115,7 +115,10 @@ class RouteTimelineCard extends StatelessWidget {
                         },
                       ),
                       LineRow(
-                        displayLineName: _formatLineName(lineNames, i),
+                        displayLineName: _formatLineName(
+                          route.segments[i].lineNames,
+                          i,
+                        ),
                         lineColor: lineController.lineColor(lineNames[i]),
                       ),
                     ],
