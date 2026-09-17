@@ -13,7 +13,7 @@ class RoutePageView extends StatelessWidget {
   final LineController lineController;
   final String? widgetRouteId;
 
-  final void Function(BuildContext context, int index, bool isWidgetRoute)
+  final void Function(Offset globalPosition, int index, bool isWidgetRoute)
   onRouteMenu;
 
   final void Function(String routeId, int segmentIndex, bool isNext)
@@ -46,8 +46,13 @@ class RoutePageView extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(left: 12.0, top: 4.0, bottom: 4.0),
             child: GestureDetector(
-              onTap: () =>
-                  onRouteMenu(context, index, widgetRouteId == route.id),
+              onTapDown: (details) {
+                onRouteMenu(
+                  details.globalPosition,
+                  index,
+                  widgetRouteId == route.id,
+                );
+              },
               child: Stack(
                 children: [
                   RouteTimelineCard(

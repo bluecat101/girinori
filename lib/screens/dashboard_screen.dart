@@ -121,12 +121,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showRouteMenu(BuildContext context, int index, bool isWidgetRoute) {
+  void _showRouteMenu(Offset globalPosition, int index, bool isWidgetRoute) {
     final route = myRoutes[index];
+    // 押されたボタン（widget）の位置とサイズを取得する
+    final position = RelativeRect.fromRect(
+      Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
+      Offset.zero & MediaQuery.of(context).size,
+    );
 
     showMenu(
       context: context,
-      position: const RelativeRect.fromLTRB(100, 200, 100, 200),
+      position: position,
       items: [
         PopupMenuItem(value: 'edit', child: const Text('編集')),
         PopupMenuItem(value: 'delete', child: const Text('削除')),
