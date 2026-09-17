@@ -24,7 +24,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   final ScrollController _routeTabScrollController = ScrollController();
   // 💡 駅名が変更されたときに、路線選択のDropdownをリフレッシュするためのNotifier
   final ValueNotifier<int> _stationChangeNotifier = ValueNotifier(0);
-  bool selectedLineValid = true; // バリデーション後に路線が未選択の区間があるかどうかのフラグ
+  List<bool> selectedLineValid = [true]; // バリデーション後に路線が未選択の区間があるかどうかのフラグ
   @override
   void initState() {
     super.initState();
@@ -138,7 +138,10 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                                 _controller.selectLine(i, newValue);
                                 setState(() {});
                               },
-                              selectedLineValid: selectedLineValid,
+                              selectedLineValid:
+                                  (i >= 0 && i < selectedLineValid.length)
+                                  ? selectedLineValid[i]
+                                  : true,
                             );
                           },
                         ),
@@ -177,13 +180,14 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                       allValid = false;
                     }
                     // すべての区間の路線選択がされているかをチェック
-                    selectedLineValid = true;
+                    selectedLineValid = List.filled(
+                      _controller.totalNodes - 1,
+                      true,
+                    );
                     for (int i = 0; i < _controller.totalNodes - 1; i++) {
                       if (_controller.getSelectedLineNames(i).isEmpty) {
-                        selectedLineValid = false;
+                        selectedLineValid[i] = false;
                         allValid = false;
-                        setState(() {}); // validateを示す
-                        break;
                       }
                     }
 
@@ -195,6 +199,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           backgroundColor: Colors.redAccent,
                         ),
                       );
+                      setState(() {}); // validateを示す
                       return;
                     }
 
