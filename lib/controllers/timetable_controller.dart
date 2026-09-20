@@ -201,7 +201,7 @@ class TimetableController {
     }
 
     if (date.weekday == DateTime.sunday) {
-      return 'sundayHoliday';
+      return 'sunday';
     }
 
     return 'weekday';
