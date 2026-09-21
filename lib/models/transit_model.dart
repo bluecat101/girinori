@@ -26,7 +26,7 @@ class TransitSegment {
 
   factory TransitSegment.fromJson(Map<String, dynamic> json) {
     return TransitSegment(
-      lineIds: List<String>.from(json['lineNames']),
+      lineIds: List<String>.from(json['lineIds']),
       departureStation: json['departureStation'],
       duration: json['duration'],
       arrivalStation: json['arrivalStation'],
