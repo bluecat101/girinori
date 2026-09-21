@@ -5,7 +5,7 @@ import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/route_master_model.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/providers/route_master_provider.dart';
-import 'package:girinori/screens/add_route_screen.dart';
+import 'package:girinori/screens/update_route_screen.dart';
 import 'package:girinori/services/file_storage.dart';
 import 'package:girinori/services/widget_service.dart';
 import 'package:girinori/widgets/dashboard/route_page_view.dart';
@@ -167,7 +167,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _addRoute() async {
     final newRoute = await Navigator.push<TransitRoute>(
       context,
-      MaterialPageRoute(builder: (context) => AddRouteScreen()),
+      MaterialPageRoute(builder: (context) => UpdateRouteScreen()),
     );
     if (newRoute == null) {
       return;
@@ -204,7 +204,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final updatedRoute = await Navigator.push<TransitRoute>(
       context,
       MaterialPageRoute(
-        builder: (context) => AddRouteScreen(editingRoute: myRoutes[index]),
+        builder: (context) => UpdateRouteScreen(editingRoute: myRoutes[index]),
       ),
     );
 
