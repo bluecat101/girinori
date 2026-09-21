@@ -1,31 +1,26 @@
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/widgets/dashboard/route_timeline_card.dart';
 
 class RoutePageView extends StatelessWidget {
   final List<TransitRoute> routes;
-  final Map<String, TimeOfDay> routeBaseTimes;
-  final Map<String, int> segmentShiftCounts;
   final PageController pageController;
   final TimetableController timetableController;
+  final LineController lineController;
   final String? widgetRouteId;
 
-  final void Function(BuildContext context, int index, bool isWidgetRoute)
+  final void Function(Offset globalPosition, int index, bool isWidgetRoute)
   onRouteMenu;
-
-  final void Function(String routeId, int segmentIndex, bool isNext)
-  onShiftTrain;
 
   const RoutePageView({
     super.key,
     required this.routes,
-    required this.routeBaseTimes,
-    required this.segmentShiftCounts,
     required this.pageController,
     required this.timetableController,
+    required this.lineController,
     required this.onRouteMenu,
-    required this.onShiftTrain,
     required this.widgetRouteId,
   });
 
@@ -43,17 +38,18 @@ class RoutePageView extends StatelessWidget {
           return Padding(
             padding: const EdgeInsets.only(left: 12.0, top: 4.0, bottom: 4.0),
             child: GestureDetector(
-              onTap: () =>
-                  onRouteMenu(context, index, widgetRouteId == route.id),
               child: Stack(
                 children: [
                   RouteTimelineCard(
                     route: route,
-                    baseTime: routeBaseTimes[route.id] ?? TimeOfDay.now(),
                     timetableController: timetableController,
-                    segmentShiftCounts: segmentShiftCounts,
-                    onShiftTrain: (segmentIndex, isNext) {
-                      onShiftTrain(route.id, segmentIndex, isNext);
+                    lineController: lineController,
+                    onRouteMenu: (globalPosition) {
+                      onRouteMenu(
+                        globalPosition,
+                        index,
+                        widgetRouteId == route.id,
+                      );
                     },
                   ),
 

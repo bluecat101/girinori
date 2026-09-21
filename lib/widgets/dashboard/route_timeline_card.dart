@@ -1,52 +1,92 @@
 import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/utils/format_time.dart';
 import 'package:girinori/widgets/dashboard/line_row.dart';
 import 'package:girinori/widgets/dashboard/station_row.dart';
 
-class RouteTimelineCard extends StatelessWidget {
+class RouteTimelineCard extends StatefulWidget {
   final TransitRoute route;
-  final TimeOfDay baseTime;
   final TimetableController timetableController;
-  final Map<String, int> segmentShiftCounts;
-  final void Function(int segmentIndex, bool isNext) onShiftTrain;
+  final LineController lineController;
+  final void Function(Offset globalPosition) onRouteMenu;
 
   const RouteTimelineCard({
     super.key,
     required this.route,
-    required this.baseTime,
     required this.timetableController,
-    required this.segmentShiftCounts,
-    required this.onShiftTrain,
+    required this.lineController,
+    required this.onRouteMenu,
   });
 
   @override
-  Widget build(BuildContext context) {
-    List<TimeOfDay> departureTimes = [];
-    List<TimeOfDay> arrivalTimes = [];
-    TimeOfDay runningTime = baseTime;
+  State<RouteTimelineCard> createState() => _RouteTimelineCardState();
+}
 
-    for (int i = 0; i < route.segments.length; i++) {
-      final segment = route.segments[i];
+class _RouteTimelineCardState extends State<RouteTimelineCard> {
+  late TransitRoute _route;
+  int startUpdateIndex = 0;
+  bool isLookingBackward = false; // 過去の列車を探すかどうかのフラグ
+  List<int> _segmentShiftCounts = [];
+  List<TimeOfDay> _segmentBaseTimes = [];
+  // 表示するための出発時刻、到着時刻、路線名を格納するリストを作成
+  List<TimeOfDay> _departureTimes = [];
+  List<TimeOfDay> _arrivalTimes = [];
+  List<String> _lineNames = []; // 区間の路線名を格納するリスト
+
+  @override
+  void initState() {
+    super.initState();
+    _route = widget.route;
+    _initializeRouteData();
+  }
+
+  void _initializeRouteData() {
+    // シフト回数リストの初期化
+    _segmentShiftCounts = List.filled(_route.segments.length, 0);
+
+    // 基準時刻リストの初期化
+    final now = TimeOfDay.now();
+    _segmentBaseTimes = List.generate(_route.segments.length, (index) => now);
+
+    _departureTimes = List.generate(_route.segments.length, (index) => now);
+    _arrivalTimes = List.generate(_route.segments.length, (index) => now);
+    _lineNames = List.generate(_route.segments.length, (index) => "");
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    for (int i = startUpdateIndex; i < _route.segments.length; i++) {
+      final segment = _route.segments[i];
       // この区間のシフト数のキーを作成して取得する
-      final shiftKey = '${route.id}_$i';
-      final shiftCount = segmentShiftCounts[shiftKey] ?? 0;
-      final (TimeOfDay dep, TimeOfDay arr) = timetableController
-          .findNextTrainTimesByLineNames(
-            lineNames: segment.lineNames,
+      final shiftCount = _segmentShiftCounts[i];
+      final SegmentResult segmentResult = widget.timetableController
+          .findNextTrainTimesByLineIds(
+            lineIds: segment.lineIds,
             departureStation: segment.departureStation,
             arrivalStation: segment.arrivalStation,
-            baseTime: runningTime,
-            shiftCount: shiftCount,
+            baseTime: _segmentBaseTimes[i],
+            isLookingBackward: i == startUpdateIndex
+                ? isLookingBackward
+                : shiftCount <
+                      0, // 最初の区間は isLookingBackward を使用し、それ以降はシフト数がマイナスかどうかで判断
           );
+      _departureTimes[i] = segmentResult.dep;
+      _arrivalTimes[i] = segmentResult.arr;
+      _lineNames[i] = segmentResult.lineName;
 
-      departureTimes.add(dep);
-      arrivalTimes.add(arr);
-
+      // 区間の基準時刻を更新する
+      _segmentBaseTimes[i] = segmentResult.dep;
       // 次の乗り換えがある場合は、本物の到着時刻に徒歩時間を足す
-      runningTime = timetableController.addMinutes(arr, segment.walkTimeAfter);
+      if (i < _route.segments.length - 1) {
+        _segmentBaseTimes[i + 1] = widget.timetableController.addMinutes(
+          segmentResult.arr,
+          segment.walkTimeAfter,
+        );
+        _segmentShiftCounts[i + 1] = 0; // 次の区間のシフト数をリセット
+      }
     }
 
     return Container(
@@ -60,19 +100,39 @@ class RouteTimelineCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              route.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _route.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+                // 右側の三点リーダー（メニューボタン）
+                InkWell(
+                  onTapDown: (details) {
+                    widget.onRouteMenu(details.globalPosition);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4.0),
+                    child: Icon(
+                      Icons.more_vert, // 縦の三点リーダー
+                      color: Colors.white70,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
             Text(
-              "${formatTime(arrivalTimes.last)} 着",
+              "${formatTime(_departureTimes.first)} -> ${formatTime(_arrivalTimes.last)} 着",
               style: const TextStyle(
                 color: Color(0xFF00E676),
                 fontWeight: FontWeight.bold,
@@ -85,41 +145,51 @@ class RouteTimelineCard extends StatelessWidget {
                 child: Column(
                   children: [
                     // 出発駅、経由駅を表示する
-                    for (int i = 0; i < route.segments.length; i++) ...[
+                    for (int i = 0; i < _route.segments.length; i++) ...[
                       DashboardStationRow(
-                        routeId: route.id,
+                        routeId: _route.id,
                         segmentIndex: i,
-                        stationName: route.segments[i].departureStation,
-                        arrivalTime: i == 0 ? null : arrivalTimes[i - 1],
-                        departureTime: departureTimes[i],
-                        segment: route.segments[i],
+                        stationName: _route.segments[i].departureStation,
+                        arrivalTime: i == 0 ? null : _arrivalTimes[i - 1],
+                        departureTime: _departureTimes[i],
+                        segment: _route.segments[i],
                         isStart: i == 0,
                         isEnd: false,
                         isNextButtonEnabled:
-                            timetableController.hasNextTimeTable,
+                            widget.timetableController.hasNextTimeTable,
                         isPreviousButtonEnabled:
-                            timetableController.hasPreviousTimeTable,
-                        shiftCount: segmentShiftCounts['${route.id}_$i'] ?? 0,
+                            widget.timetableController.hasPreviousTimeTable,
+                        shiftCount: _segmentShiftCounts[i],
                         onShiftTrain: (isNext) {
-                          // _shiftTrainCount(route.id, i, forward);
-                          onShiftTrain(i, isNext);
+                          _shiftTrainCount(i, isNext);
                         },
                       ),
-                      LineRow(lineNames: route.segments[i].lineNames),
+                      LineRow(
+                        displayLineName: _formatLineName(
+                          TransitSegment.extractUniqueLineIds(
+                            _route.segments[i].lineIds,
+                          ),
+                          i,
+                        ),
+                        lineColor: widget.lineController.lineColor(
+                          _lineNames[i],
+                        ),
+                      ),
                     ],
                     // 到着駅を表示する
                     DashboardStationRow(
-                      routeId: route.id,
-                      segmentIndex: route.segments.length,
-                      stationName: route.segments.last.arrivalStation,
-                      arrivalTime: arrivalTimes.last,
+                      routeId: _route.id,
+                      segmentIndex: _route.segments.length,
+                      stationName: _route.segments.last.arrivalStation,
+                      arrivalTime: _arrivalTimes.last,
                       departureTime: null,
-                      segment: route.segments.last,
+                      segment: _route.segments.last,
                       isStart: false,
                       isEnd: true, // 到着駅には列車変更ボタンがない
-                      isNextButtonEnabled: timetableController.hasNextTimeTable,
+                      isNextButtonEnabled:
+                          widget.timetableController.hasNextTimeTable,
                       isPreviousButtonEnabled:
-                          timetableController.hasPreviousTimeTable,
+                          widget.timetableController.hasPreviousTimeTable,
                       shiftCount: 0,
                       onShiftTrain: null,
                     ),
@@ -131,5 +201,35 @@ class RouteTimelineCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  /// 列車のシフト数を更新する
+  void _shiftTrainCount(int segmentIndex, bool isNext) {
+    setState(() {
+      final currentShift = _segmentShiftCounts[segmentIndex];
+
+      _segmentShiftCounts[segmentIndex] = isNext
+          ? currentShift + 1
+          : currentShift - 1;
+      // 更新開始インデックスを設定して、次回のビルド時にその区間から再計算する
+      startUpdateIndex = segmentIndex;
+      isLookingBackward = !isNext;
+
+      // 基準時刻を更新する
+      _segmentBaseTimes[segmentIndex] = widget.timetableController.addMinutes(
+        _segmentBaseTimes[segmentIndex],
+        isNext ? 1 : -1,
+      );
+    });
+  }
+
+  String _formatLineName(List<String> lineNames, int index) {
+    // インデックスが範囲内かチェックするガード
+    if (index < 0 || index >= lineNames.length) {
+      return '';
+    }
+
+    // 複数の路線がある場合は名前の後ろに ' ... ' を付与する
+    return lineNames.length > 1 ? '${lineNames[index]} ... ' : lineNames[index];
   }
 }

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:girinori/models/route_master_model.dart';
+import 'package:girinori/models/transit_model.dart';
 import 'package:girinori/models/trip_model.dart';
 
 class TrainDayRange {
@@ -67,54 +68,24 @@ class TimetableController {
   /// ============================================================
   /// 路線時刻表読み込み(From 路線名)
   /// ============================================================
-  Future<void> loadTimetableFileFormLineName(List<String> lineNames) async {
-    final allLineNames = <String>{};
-    for (final lineName in lineNames) {
-      final foundLines = _getLinesByLineName(
-        timetableFileMap.keys.toList(),
-        lineName,
-      );
-      allLineNames.addAll(foundLines);
+  Future<void> loadTimetableFileForLines(List<String> lineIds) async {
+    for (final lineId in lineIds) {
+      await _loadTimetableFileForLine(lineId);
     }
-    for (final line in allLineNames) {
-      await _loadTimetableFileForLine(line);
-    }
-  }
-
-  /// ============================================================
-  /// 複数の路線名から、全ての路線IDを取得する
-  /// ============================================================
-  List<String> _getAllLineIdsByLineNames(
-    List<String> lines,
-    List<String> lineNames,
-  ) {
-    final allLineIds = <String>{};
-    for (final lineName in lineNames) {
-      final foundLines = _getLinesByLineName(lines, lineName);
-      allLineIds.addAll(foundLines);
-    }
-    return allLineIds.toList();
-  }
-
-  /// ============================================================
-  /// 路線名から路線IDを取得する
-  /// ============================================================
-  List<String> _getLinesByLineName(List<String> lines, String lineName) {
-    return lines.where((line) => line.startsWith('${lineName}_')).toList();
   }
 
   // ============================================================
   // 路線時刻表読み込み(From 路線ID)
   // ============================================================
-  Future<void> _loadTimetableFileForLine(String lineName) async {
-    if (cachedTimetables.containsKey(lineName)) {
+  Future<void> _loadTimetableFileForLine(String lineId) async {
+    if (cachedTimetables.containsKey(lineId)) {
       return;
     }
 
-    final fileName = timetableFileMap[lineName];
+    final fileName = timetableFileMap[lineId];
 
     if (fileName == null) {
-      debugPrint('❌ timetable file not found: $lineName');
+      debugPrint('❌ timetable file not found: $lineId');
       return;
     }
 
@@ -124,17 +95,14 @@ class TimetableController {
       final Map<String, dynamic> lineData = jsonDecode(jsonString);
 
       if (lineData['trips'] is List) {
-        cachedTimetables[lineName] = (lineData['trips'] as List)
+        cachedTimetables[lineId] = (lineData['trips'] as List)
             .map((trip) => Trip.fromJson(Map<String, dynamic>.from(trip)))
             .toList();
       }
       // 始発・終電を作成
-      _buildTrainDayRanges(
-        lineId: lineName,
-        trips: cachedTimetables[lineName]!,
-      );
+      _buildTrainDayRanges(lineId: lineId, trips: cachedTimetables[lineId]!);
     } catch (e) {
-      debugPrint('❌ 路線ファイル [$lineName] のロード失敗: $e');
+      debugPrint('❌ 路線ファイル [$lineId] のロード失敗: $e');
     }
   }
 
@@ -200,61 +168,88 @@ class TimetableController {
     }
 
     if (date.weekday == DateTime.sunday) {
-      return 'sundayHoliday';
+      return 'sunday';
     }
 
     return 'weekday';
   }
 
-  (TimeOfDay, TimeOfDay) findNextTrainTimesByLineNames({
-    required List<String> lineNames,
+  SegmentResult findNextTrainTimesByLineIds({
+    required List<String> lineIds,
     required String departureStation,
     required String arrivalStation,
-    required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
-    int shiftCount = 0,
+    required TimeOfDay baseTime,
+    bool isLookingBackward = false,
   }) {
+    // 出発駅の路線情報を取得
     final depLineIds = routeMaster[departureStation]?.keys.toList();
     if (depLineIds == null) {
-      return (baseTime, baseTime);
+      return SegmentResult(dep: baseTime, arr: baseTime, lineName: '');
     }
-    final lineIds = _getAllLineIdsByLineNames(depLineIds, lineNames);
-    if (lineIds.isEmpty) {
-      return (baseTime, baseTime);
-    }
+
     TimeOfDay? earliestDeparture;
     TimeOfDay? earliestArrival;
+    String earliestLineName = '';
+
+    int? targetDiff; // 基準からの差分の最小値を保持する変数
+    final int baseMinutes = baseTime.hour * 60 + baseTime.minute;
+
     for (final lineId in lineIds) {
-      final (TimeOfDay dep, TimeOfDay arr) = findNextTrainTimes(
+      // 内部の単道路線検索を呼び出す
+      final (TimeOfDay dep, TimeOfDay arr) = _findNextTrainTimes(
         lineId: lineId,
         departureStation: departureStation,
         arrivalStation: arrivalStation,
         baseTime: baseTime,
-        shiftCount: shiftCount,
+        isLookingBackward: isLookingBackward,
       );
       if (dep != baseTime || arr != baseTime) {
-        if (earliestDeparture == null ||
-            dep.hour * 60 + dep.minute <
-                earliestDeparture.hour * 60 + earliestDeparture.minute) {
-          earliestDeparture = dep;
-          earliestArrival = arr;
+        int depMinutes = dep.hour * 60 + dep.minute;
+
+        // 日付またぎの補正（必要に応じて調整）
+        if (!isLookingBackward && depMinutes < baseMinutes) {
+          depMinutes += 24 * 60; // 未来方向で日付をまたぐ場合
+        } else if (isLookingBackward && depMinutes > baseMinutes) {
+          depMinutes -= 24 * 60; // 過去方向で日付をまたぐ場合（前日の深夜など）
+        }
+
+        // 差分の計算（未来か過去かで計算の向きが変わる）
+        final int diff = isLookingBackward
+            ? baseMinutes -
+                  depMinutes // 過去方向の差分（例: 30分前なら +30）
+            : depMinutes - baseMinutes; // 未来方向の差分（例: 30分後なら +30）
+
+        // 💡 差分が有効（0以上）かつ、より近いものを採用する
+        if (diff >= 0) {
+          if (targetDiff == null || diff < targetDiff) {
+            targetDiff = diff;
+            earliestDeparture = dep;
+            earliestLineName = _extractUniqueLineName(lineId);
+            earliestArrival = arr;
+          }
         }
       }
     }
 
-    return (earliestDeparture ?? baseTime, earliestArrival ?? baseTime);
+    return SegmentResult(
+      dep: earliestDeparture ?? baseTime,
+      arr: earliestArrival ?? baseTime,
+      lineName: earliestLineName,
+    );
   }
 
-  (TimeOfDay, TimeOfDay) findNextTrainTimes({
+  (TimeOfDay, TimeOfDay) _findNextTrainTimes({
     required String lineId,
     required String departureStation,
     required String arrivalStation,
     required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
-    int shiftCount = 0,
+    required bool isLookingBackward, // 過去の列車を探すかどうかのフラグ
   }) {
     final jsonTrips = cachedTimetables[lineId];
-    if (jsonTrips == null || jsonTrips.isEmpty) {
-      return (baseTime, baseTime);
-    }
+    assert(
+      jsonTrips != null && jsonTrips.isNotEmpty,
+      '路線 [$lineId] の時刻表がロードされていません。',
+    );
 
     // ============================================================
     // 現在時刻
@@ -284,11 +279,6 @@ class TimetableController {
     }
 
     // ============================================================
-    // 基準日の曜日
-    // ============================================================
-    // final baseDayType = _dayTypeFromDate(baseDate);
-
-    // ============================================================
     // 基準日の時刻表を取得
     // ============================================================
     List<_TrainCandidate> getCandidates(DateTime date, int dayOffset) {
@@ -296,7 +286,7 @@ class TimetableController {
 
       final candidates = <_TrainCandidate>[];
 
-      for (final trip in jsonTrips) {
+      for (final trip in jsonTrips!) {
         if (trip.dayType != dayType) {
           continue;
         }
@@ -357,29 +347,36 @@ class TimetableController {
 
     // ============================================================
     // 基準列車を探す
-    // 基準の時間（normalizedBaseMinutes）以降で最初の列車を探す
     // ============================================================
-    int baseIndex = -1;
-    for (int i = 0; i < candidates.length; i++) {
-      if (candidates[i].departureMinutes >= normalizedBaseMinutes) {
-        baseIndex = i;
-        break;
+    int targetIndex = -1;
+
+    if (!isLookingBackward) {
+      // 🔀 【未来（次へ）を探す場合】
+      // 基準時間（normalizedBaseMinutes）「以降」で最初の列車を探す
+      for (int i = 0; i < candidates.length; i++) {
+        if (candidates[i].departureMinutes >= normalizedBaseMinutes) {
+          targetIndex = i;
+          break;
+        }
+      }
+    } else {
+      // 🔙 【過去（1本前）を探す場合】
+      // 基準時間（normalizedBaseMinutes）「以前」で、一番後ろ（直前の列車）を探す
+      for (int i = candidates.length - 1; i >= 0; i--) {
+        if (candidates[i].departureMinutes <= normalizedBaseMinutes) {
+          targetIndex = i;
+          break;
+        }
       }
     }
 
-    // assert(baseIndex != -1, '時刻表から検索できませんでした。');
+    // 万が一見つからなかった場合の安全ガード
+    if (targetIndex == -1) {
+      targetIndex = isLookingBackward ? 0 : candidates.length - 1;
+    }
 
-    // ============================================================
-    // shiftCount
-    // ============================================================
-    int targetIndex = baseIndex + shiftCount;
-    if (targetIndex < 0) {
-      targetIndex = 0;
-    }
-    if (targetIndex >= candidates.length) {
-      targetIndex = candidates.length - 1;
-    }
-    final target = candidates[targetIndex];
+    final dep = candidates[targetIndex].departureMinutes;
+    final arr = candidates[targetIndex].arrivalMinutes;
 
     _hasNextTimeTable = (targetIndex != candidates.length - 1);
     _hasPreviousTimeTable = (targetIndex != 0);
@@ -387,12 +384,12 @@ class TimetableController {
     // ============================================================
     // TimeOfDayへ変換
     // ============================================================
-    final departureTime = convertToTimeOfDay(target.departureMinutes);
-    final arrivalTime = convertToTimeOfDay(target.arrivalMinutes);
+    final departureTime = _convertToTimeOfDay(dep);
+    final arrivalTime = _convertToTimeOfDay(arr);
     return (departureTime, arrivalTime);
   }
 
-  TimeOfDay convertToTimeOfDay(int minutes) {
+  TimeOfDay _convertToTimeOfDay(int minutes) {
     minutes = minutes % 1440; // 24時間を超える場合は繰り返す
     return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
   }
@@ -403,5 +400,12 @@ class TimetableController {
   TimeOfDay addMinutes(TimeOfDay time, int minutes) {
     final total = time.hour * 60 + time.minute + minutes;
     return TimeOfDay(hour: (total ~/ 60) % 24, minute: total % 60);
+  }
+
+  /// ============================================================
+  /// 路線名からユニークな路線名を抽出する
+  /// ============================================================
+  String _extractUniqueLineName(String fullLineName) {
+    return fullLineName.split('_').first;
   }
 }

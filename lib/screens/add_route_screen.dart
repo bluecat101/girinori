@@ -24,6 +24,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
   final ScrollController _routeTabScrollController = ScrollController();
   // 💡 駅名が変更されたときに、路線選択のDropdownをリフレッシュするためのNotifier
   final ValueNotifier<int> _stationChangeNotifier = ValueNotifier(0);
+  List<bool> selectedLineValid = [true]; // バリデーション後に路線が未選択の区間があるかどうかのフラグ
   @override
   void initState() {
     super.initState();
@@ -129,14 +130,20 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           builder: (context, _, child) {
                             return RouteLineNode(
                               segmentIndex: i,
-                              availableLineNames: _controller
-                                  .getAvailableLineNames(i),
-                              selectedLineNames: _controller
-                                  .getSelectedLineNames(i),
-                              onChanged: (newValue) {
-                                _controller.selectLine(i, newValue);
+                              availableLineIds: _controller.getAvailableLineIds(
+                                i,
+                              ),
+                              selectedLineIds: _controller.getSelectedLineIds(
+                                i,
+                              ),
+                              onChanged: (selectedLineNames) {
+                                _controller.selectLine(i, selectedLineNames);
                                 setState(() {});
                               },
+                              selectedLineValid:
+                                  (i >= 0 && i < selectedLineValid.length)
+                                  ? selectedLineValid[i]
+                                  : true,
                             );
                           },
                         ),
@@ -169,11 +176,26 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                     elevation: 0,
                   ),
                   onPressed: () {
+                    // ルート登録前にすべての区間の路線選択をリセットしてバリデーションをやり直す
+                    for (int i = 0; i < _controller.totalNodes - 1; i++) {
+                      _controller.removeSelectedLines(i);
+                    }
+
                     // 💡 【改善④】すべてのルート（非表示含む）のバリデーションを一括チェック
                     bool allValid = true;
-                    // 隠れているルートのフォームを一時的に検証するために、現在のインデックスを偽装してチェック
                     if (!_controller.formKey.currentState!.validate()) {
                       allValid = false;
+                    }
+                    // すべての区間の路線選択がされているかをチェック
+                    selectedLineValid = List.filled(
+                      _controller.totalNodes - 1,
+                      true,
+                    );
+                    for (int i = 0; i < _controller.totalNodes - 1; i++) {
+                      if (_controller.getSelectedLineIds(i).isEmpty) {
+                        selectedLineValid[i] = false;
+                        allValid = false;
+                      }
                     }
 
                     // 不備があればSnackBarで通知して登録処理を中断
@@ -184,6 +206,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           backgroundColor: Colors.redAccent,
                         ),
                       );
+                      setState(() {}); // validateを示す
                       return;
                     }
 

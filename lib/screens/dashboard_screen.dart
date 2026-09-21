@@ -1,5 +1,6 @@
-import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
 import 'package:girinori/models/route_master_model.dart';
 import 'package:girinori/models/transit_model.dart';
@@ -31,13 +32,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // 💡 ユーザーが登録したルートのリスト（prefixがクローラー仕様の日本語になっています）
   List<TransitRoute> myRoutes = [];
 
-  final Map<String, TimeOfDay> _routeBaseTimes = {};
-  // どのルートのどの区間が何本シフトしているかを保存するマップ
-  // Key: "ルートID_区間インデックス" (例: "route_1_0")、 Value: シフト数 (-1や2など)
-  final Map<String, int> _segmentShiftCounts = {};
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
   late final TimetableController _timetableController;
+  late final LineController _lineController;
   final now = DateTime.now();
   @override
   void initState() {
@@ -54,10 +52,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Future<void> _initializeData() async {
     await context.read<RouteMasterProvider>().load();
-    print('DashboardScreen: _initializeData() called');
-    print("RouteMaster: ${routeMaster.length} routes loaded");
     _timetableController = TimetableController(routeMaster: routeMaster);
+    _lineController = LineController();
     await _timetableController.loadTimetableIndex();
+    await _lineController.init();
     if (myRoutes.isEmpty) {
       final json = await FileStorage().load();
       if (json != null) {
@@ -73,15 +71,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     setState(() {
       _isLoading = false;
-    });
-  }
-
-  void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
-    setState(() {
-      final key = "${routeId}_$segmentIndex";
-      final currentShift = _segmentShiftCounts[key] ?? 0;
-
-      _segmentShiftCounts[key] = isNext ? currentShift + 1 : currentShift - 1;
     });
   }
 
@@ -107,23 +96,26 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )
           : RoutePageView(
               routes: myRoutes,
-              routeBaseTimes: _routeBaseTimes,
-              segmentShiftCounts: _segmentShiftCounts,
               pageController: _pageController,
               timetableController: _timetableController,
+              lineController: _lineController,
               onRouteMenu: _showRouteMenu,
-              onShiftTrain: _shiftTrainCount,
               widgetRouteId: widgetRouteId,
             ),
     );
   }
 
-  void _showRouteMenu(BuildContext context, int index, bool isWidgetRoute) {
+  void _showRouteMenu(Offset globalPosition, int index, bool isWidgetRoute) {
     final route = myRoutes[index];
+    // 押されたボタン（widget）の位置とサイズを取得する
+    final position = RelativeRect.fromRect(
+      Rect.fromLTWH(globalPosition.dx, globalPosition.dy, 0, 0),
+      Offset.zero & MediaQuery.of(context).size,
+    );
 
     showMenu(
       context: context,
-      position: const RelativeRect.fromLTRB(100, 200, 100, 200),
+      position: position,
       items: [
         PopupMenuItem(value: 'edit', child: const Text('編集')),
         PopupMenuItem(value: 'delete', child: const Text('削除')),
@@ -150,14 +142,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initRoutes(List<TransitRoute> routes) async {
     for (final route in routes) {
       for (final segment in route.segments) {
-        if (segment.lineNames.isNotEmpty) {
-          await _timetableController.loadTimetableFileFormLineName(
-            segment.lineNames,
-          );
+        if (segment.lineIds.isNotEmpty) {
+          await _timetableController.loadTimetableFileForLines(segment.lineIds);
         }
       }
       myRoutes.add(route);
-      _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
     }
 
     // widgetを更新
@@ -187,15 +176,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in newRoute.segments) {
-      if (segment.lineNames.isNotEmpty) {
-        await _timetableController.loadTimetableFileFormLineName(
-          segment.lineNames,
-        );
+      if (segment.lineIds.isNotEmpty) {
+        await _timetableController.loadTimetableFileForLines(segment.lineIds);
       }
     }
     setState(() {
       myRoutes.add(newRoute);
-      _routeBaseTimes[newRoute.id] = TimeOfDay.fromDateTime(now);
       _isLoading = false;
     });
     // widgetを更新
@@ -228,10 +214,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in updatedRoute.segments) {
-      if (segment.lineNames.isNotEmpty) {
-        await _timetableController.loadTimetableFileFormLineName(
-          segment.lineNames,
-        );
+      if (segment.lineIds.isNotEmpty) {
+        await _timetableController.loadTimetableFileForLines(segment.lineIds);
       }
     }
     setState(() {
@@ -388,17 +372,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
     TimeOfDay baseTime = TimeOfDay.fromDateTime(now);
 
     for (final segment in segments) {
-      final (dep, arr) = timetableController.findNextTrainTimesByLineNames(
-        lineNames: segment.lineNames,
-        departureStation: segment.departureStation,
-        arrivalStation: segment.arrivalStation,
-        baseTime: baseTime,
-        shiftCount: 0,
-      );
-      results.add(SegmentResult(dep: dep, arr: arr));
-
+      final SegmentResult segmentResult = timetableController
+          .findNextTrainTimesByLineIds(
+            lineIds: segment.lineIds,
+            departureStation: segment.departureStation,
+            arrivalStation: segment.arrivalStation,
+            baseTime: baseTime,
+          );
+      results.add(segmentResult);
       // 次の区間は「到着＋徒歩時間」から検索
-      baseTime = timetableController.addMinutes(arr, segment.walkTimeAfter);
+      baseTime = timetableController.addMinutes(
+        segmentResult.arr,
+        segment.walkTimeAfter,
+      );
     }
 
     return results;

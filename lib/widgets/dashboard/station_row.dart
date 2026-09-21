@@ -158,27 +158,31 @@ class DashboardStationRow extends StatelessWidget {
   // ============================================================
 
   Widget _buildShiftButtons() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _shiftIconButton(isNext: false, enabled: isPreviousButtonEnabled),
-        _shiftIconButton(isNext: true, enabled: isNextButtonEnabled),
-      ],
+    return Container(
+      // color: Colors.blue.withOpacity(0.3), // デバッグ用：ボタン群全体に青色を塗る
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _shiftIconButton(isNext: false, enabled: isPreviousButtonEnabled),
+          _shiftIconButton(isNext: true, enabled: isNextButtonEnabled),
+        ],
+      ),
     );
   }
 
   Widget _shiftIconButton({required bool isNext, required bool enabled}) {
-    return IconButton(
-      icon: Icon(
-        isNext ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_left,
-        color: enabled ? Colors.white38 : Colors.white12,
-        size: 16,
-      ),
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(),
-      onPressed: enabled && onShiftTrain != null
+    return InkWell(
+      onTap: enabled && onShiftTrain != null
           ? () => onShiftTrain!(isNext)
           : null,
+      child: Padding(
+        padding: const EdgeInsets.all(2), // ここを 0 にすればさらに詰められます
+        child: Icon(
+          isNext ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_left,
+          color: enabled ? Colors.white38 : Colors.white12,
+          size: 25,
+        ),
+      ),
     );
   }
 }

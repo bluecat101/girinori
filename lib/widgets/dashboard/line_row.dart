@@ -1,18 +1,17 @@
 import 'package:flutter/material.dart';
 
 class LineRow extends StatelessWidget {
-  final List<String> lineNames;
+  final String displayLineName;
+  final Color lineColor;
 
-  const LineRow({super.key, required this.lineNames});
+  const LineRow({
+    super.key,
+    required this.displayLineName,
+    required this.lineColor,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // 表示する路線名
-    final cleanName = lineNames.isNotEmpty ? lineNames.first.split('_')[0] : '';
-
-    // 複数の路線がある場合は「...」を追加
-    final displayName = lineNames.length > 1 ? '$cleanName...' : cleanName;
-
     return Row(
       children: [
         Padding(
@@ -20,17 +19,17 @@ class LineRow extends StatelessWidget {
           child: Container(
             width: 1,
             height: 16,
-            color: const Color(0xFF00B0FF).withOpacity(0.5),
+            color: lineColor.withOpacity(0.5),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
-            displayName,
+            displayLineName,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFF00B0FF),
+            style: TextStyle(
+              color: lineColor,
               fontSize: 9,
               fontWeight: FontWeight.w500,
             ),
