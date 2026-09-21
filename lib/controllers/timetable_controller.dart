@@ -211,26 +211,33 @@ class TimetableController {
     required List<String> lineNames,
     required String departureStation,
     required String arrivalStation,
-    required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
-    int shiftCount = 0,
+    required TimeOfDay baseTime,
+    int shiftCount = 0, // プラマイで「次へ」「前へ」を判定する例
   }) {
     final defaultSegmentResult = SegmentResult(
       dep: baseTime,
       arr: baseTime,
       lineName: '',
     );
+
     final depLineIds = routeMaster[departureStation]?.keys.toList();
-    if (depLineIds == null) {
-      return defaultSegmentResult;
-    }
+    if (depLineIds == null) return defaultSegmentResult;
+
     final lineIds = _getAllLineIdsByLineNames(depLineIds, lineNames);
-    if (lineIds.isEmpty) {
-      return defaultSegmentResult;
-    }
+    if (lineIds.isEmpty) return defaultSegmentResult;
+
     TimeOfDay? earliestDeparture;
     TimeOfDay? earliestArrival;
     String earliestLineName = '';
+
+    int? targetDiff; // 基準からの差分の最小値を保持する変数
+    final int baseMinutes = baseTime.hour * 60 + baseTime.minute;
+
+    // shiftCount がマイナスなら「過去（前へ）」、0以上なら「未来（次へ）」を探すフラグ
+    final bool isLookingBackward = shiftCount < 0;
+
     for (final lineId in lineIds) {
+      // 内部の単道路線検索を呼び出す
       final (TimeOfDay dep, TimeOfDay arr) = findNextTrainTimes(
         lineId: lineId,
         departureStation: departureStation,
@@ -239,12 +246,29 @@ class TimetableController {
         shiftCount: shiftCount,
       );
       if (dep != baseTime || arr != baseTime) {
-        if (earliestDeparture == null ||
-            dep.hour * 60 + dep.minute <
-                earliestDeparture.hour * 60 + earliestDeparture.minute) {
-          earliestDeparture = dep;
-          earliestLineName = _extractUniqueLineName(lineId);
-          earliestArrival = arr;
+        int depMinutes = dep.hour * 60 + dep.minute;
+
+        // 日付またぎの補正（必要に応じて調整）
+        if (!isLookingBackward && depMinutes < baseMinutes) {
+          depMinutes += 24 * 60; // 未来方向で日付をまたぐ場合
+        } else if (isLookingBackward && depMinutes > baseMinutes) {
+          depMinutes -= 24 * 60; // 過去方向で日付をまたぐ場合（前日の深夜など）
+        }
+
+        // 差分の計算（未来か過去かで計算の向きが変わる）
+        final int diff = isLookingBackward
+            ? baseMinutes -
+                  depMinutes // 過去方向の差分（例: 30分前なら +30）
+            : depMinutes - baseMinutes; // 未来方向の差分（例: 30分後なら +30）
+
+        // 💡 差分が有効（0以上）かつ、より近いものを採用する
+        if (diff >= 0) {
+          if (targetDiff == null || diff < targetDiff) {
+            targetDiff = diff;
+            earliestDeparture = dep;
+            earliestLineName = _extractUniqueLineName(lineId);
+            earliestArrival = arr;
+          }
         }
       }
     }

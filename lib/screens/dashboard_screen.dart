@@ -1,4 +1,4 @@
-import 'package:flutter/services.dart'; // 💡 rootBundle（ファイル読み込み）に必要です
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:girinori/controllers/line_controller.dart';
 import 'package:girinori/controllers/timetable_controller.dart';
@@ -32,10 +32,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // 💡 ユーザーが登録したルートのリスト（prefixがクローラー仕様の日本語になっています）
   List<TransitRoute> myRoutes = [];
 
-  final Map<String, TimeOfDay> _routeBaseTimes = {};
-  // どのルートのどの区間が何本シフトしているかを保存するマップ
-  // Key: "ルートID_区間インデックス" (例: "route_1_0")、 Value: シフト数 (-1や2など)
-  final Map<String, int> _segmentShiftCounts = {};
   final PageController _pageController = PageController(viewportFraction: 0.43);
 
   late final TimetableController _timetableController;
@@ -78,15 +74,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  void _shiftTrainCount(String routeId, int segmentIndex, bool isNext) {
-    setState(() {
-      final key = "${routeId}_$segmentIndex";
-      final currentShift = _segmentShiftCounts[key] ?? 0;
-
-      _segmentShiftCounts[key] = isNext ? currentShift + 1 : currentShift - 1;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -109,13 +96,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
             )
           : RoutePageView(
               routes: myRoutes,
-              routeBaseTimes: _routeBaseTimes,
-              segmentShiftCounts: _segmentShiftCounts,
               pageController: _pageController,
               timetableController: _timetableController,
               lineController: _lineController,
               onRouteMenu: _showRouteMenu,
-              onShiftTrain: _shiftTrainCount,
               widgetRouteId: widgetRouteId,
             ),
     );
@@ -165,7 +149,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         }
       }
       myRoutes.add(route);
-      _routeBaseTimes[route.id] = TimeOfDay.fromDateTime(now);
     }
 
     // widgetを更新
@@ -203,7 +186,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     setState(() {
       myRoutes.add(newRoute);
-      _routeBaseTimes[newRoute.id] = TimeOfDay.fromDateTime(now);
       _isLoading = false;
     });
     // widgetを更新

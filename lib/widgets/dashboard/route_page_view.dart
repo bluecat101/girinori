@@ -6,8 +6,6 @@ import 'package:girinori/widgets/dashboard/route_timeline_card.dart';
 
 class RoutePageView extends StatelessWidget {
   final List<TransitRoute> routes;
-  final Map<String, TimeOfDay> routeBaseTimes;
-  final Map<String, int> segmentShiftCounts;
   final PageController pageController;
   final TimetableController timetableController;
   final LineController lineController;
@@ -16,19 +14,13 @@ class RoutePageView extends StatelessWidget {
   final void Function(Offset globalPosition, int index, bool isWidgetRoute)
   onRouteMenu;
 
-  final void Function(String routeId, int segmentIndex, bool isNext)
-  onShiftTrain;
-
   const RoutePageView({
     super.key,
     required this.routes,
-    required this.routeBaseTimes,
-    required this.segmentShiftCounts,
     required this.pageController,
     required this.timetableController,
     required this.lineController,
     required this.onRouteMenu,
-    required this.onShiftTrain,
     required this.widgetRouteId,
   });
 
@@ -50,13 +42,8 @@ class RoutePageView extends StatelessWidget {
                 children: [
                   RouteTimelineCard(
                     route: route,
-                    baseTime: routeBaseTimes[route.id] ?? TimeOfDay.now(),
                     timetableController: timetableController,
                     lineController: lineController,
-                    segmentShiftCounts: segmentShiftCounts,
-                    onShiftTrain: (segmentIndex, isNext) {
-                      onShiftTrain(route.id, segmentIndex, isNext);
-                    },
                     onRouteMenu: (globalPosition) {
                       onRouteMenu(
                         globalPosition,
