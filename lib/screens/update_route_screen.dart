@@ -7,16 +7,16 @@ import 'package:girinori/widgets/route_input/route_station_node.dart';
 import 'package:girinori/widgets/route_line_node.dart';
 import 'package:provider/provider.dart';
 
-class AddRouteScreen extends StatefulWidget {
+class UpdateRouteScreen extends StatefulWidget {
   final TransitRoute? editingRoute;
 
-  const AddRouteScreen({super.key, this.editingRoute});
+  const UpdateRouteScreen({super.key, this.editingRoute});
 
   @override
-  State<AddRouteScreen> createState() => _AddRouteScreenState();
+  State<UpdateRouteScreen> createState() => _UpdateRouteScreenState();
 }
 
-class _AddRouteScreenState extends State<AddRouteScreen> {
+class _UpdateRouteScreenState extends State<UpdateRouteScreen> {
   RouteMaster get routeMaster =>
       context.read<RouteMasterProvider>().routeMaster;
   // 💡 共通のFormStateではなく、ルートごとに独立したFormKeyを持つことで全裏ルートを一括バリデーションする

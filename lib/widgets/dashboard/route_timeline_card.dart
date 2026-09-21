@@ -43,6 +43,14 @@ class _RouteTimelineCardState extends State<RouteTimelineCard> {
     _initializeRouteData();
   }
 
+  // add,editした時に親でsetStateが走るので、widget.routeが変わったら再初期化する
+  @override
+  void didUpdateWidget(RouteTimelineCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _route = widget.route;
+    _initializeRouteData();
+  }
+
   void _initializeRouteData() {
     // シフト回数リストの初期化
     _segmentShiftCounts = List.filled(_route.segments.length, 0);
