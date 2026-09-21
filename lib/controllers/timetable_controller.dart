@@ -68,54 +68,24 @@ class TimetableController {
   /// ============================================================
   /// 路線時刻表読み込み(From 路線名)
   /// ============================================================
-  Future<void> loadTimetableFileFormLineName(List<String> lineNames) async {
-    final allLineNames = <String>{};
-    for (final lineName in lineNames) {
-      final foundLines = _getLinesByLineName(
-        timetableFileMap.keys.toList(),
-        lineName,
-      );
-      allLineNames.addAll(foundLines);
+  Future<void> loadTimetableFileForLines(List<String> lineIds) async {
+    for (final lineId in lineIds) {
+      await _loadTimetableFileForLine(lineId);
     }
-    for (final line in allLineNames) {
-      await _loadTimetableFileForLine(line);
-    }
-  }
-
-  /// ============================================================
-  /// 複数の路線名から、全ての路線IDを取得する
-  /// ============================================================
-  List<String> _getAllLineIdsByLineNames(
-    List<String> lines,
-    List<String> lineNames,
-  ) {
-    final allLineIds = <String>{};
-    for (final lineName in lineNames) {
-      final foundLines = _getLinesByLineName(lines, lineName);
-      allLineIds.addAll(foundLines);
-    }
-    return allLineIds.toList();
-  }
-
-  /// ============================================================
-  /// 路線名から路線IDを取得する
-  /// ============================================================
-  List<String> _getLinesByLineName(List<String> lines, String lineName) {
-    return lines.where((line) => line.startsWith('${lineName}_')).toList();
   }
 
   // ============================================================
   // 路線時刻表読み込み(From 路線ID)
   // ============================================================
-  Future<void> _loadTimetableFileForLine(String lineName) async {
-    if (cachedTimetables.containsKey(lineName)) {
+  Future<void> _loadTimetableFileForLine(String lineId) async {
+    if (cachedTimetables.containsKey(lineId)) {
       return;
     }
 
-    final fileName = timetableFileMap[lineName];
+    final fileName = timetableFileMap[lineId];
 
     if (fileName == null) {
-      debugPrint('❌ timetable file not found: $lineName');
+      debugPrint('❌ timetable file not found: $lineId');
       return;
     }
 
@@ -125,17 +95,14 @@ class TimetableController {
       final Map<String, dynamic> lineData = jsonDecode(jsonString);
 
       if (lineData['trips'] is List) {
-        cachedTimetables[lineName] = (lineData['trips'] as List)
+        cachedTimetables[lineId] = (lineData['trips'] as List)
             .map((trip) => Trip.fromJson(Map<String, dynamic>.from(trip)))
             .toList();
       }
       // 始発・終電を作成
-      _buildTrainDayRanges(
-        lineId: lineName,
-        trips: cachedTimetables[lineName]!,
-      );
+      _buildTrainDayRanges(lineId: lineId, trips: cachedTimetables[lineId]!);
     } catch (e) {
-      debugPrint('❌ 路線ファイル [$lineName] のロード失敗: $e');
+      debugPrint('❌ 路線ファイル [$lineId] のロード失敗: $e');
     }
   }
 
@@ -207,24 +174,18 @@ class TimetableController {
     return 'weekday';
   }
 
-  SegmentResult findNextTrainTimesByLineNames({
-    required List<String> lineNames,
+  SegmentResult findNextTrainTimesByLineIds({
+    required List<String> lineIds,
     required String departureStation,
     required String arrivalStation,
     required TimeOfDay baseTime,
     int shiftCount = 0, // プラマイで「次へ」「前へ」を判定する例
   }) {
-    final defaultSegmentResult = SegmentResult(
-      dep: baseTime,
-      arr: baseTime,
-      lineName: '',
-    );
-
+    // 出発駅の路線情報を取得
     final depLineIds = routeMaster[departureStation]?.keys.toList();
-    if (depLineIds == null) return defaultSegmentResult;
-
-    final lineIds = _getAllLineIdsByLineNames(depLineIds, lineNames);
-    if (lineIds.isEmpty) return defaultSegmentResult;
+    if (depLineIds == null) {
+      return SegmentResult(dep: baseTime, arr: baseTime, lineName: '');
+    }
 
     TimeOfDay? earliestDeparture;
     TimeOfDay? earliestArrival;
@@ -238,7 +199,7 @@ class TimetableController {
 
     for (final lineId in lineIds) {
       // 内部の単道路線検索を呼び出す
-      final (TimeOfDay dep, TimeOfDay arr) = findNextTrainTimes(
+      final (TimeOfDay dep, TimeOfDay arr) = _findNextTrainTimes(
         lineId: lineId,
         departureStation: departureStation,
         arrivalStation: arrivalStation,
@@ -280,7 +241,7 @@ class TimetableController {
     );
   }
 
-  (TimeOfDay, TimeOfDay) findNextTrainTimes({
+  (TimeOfDay, TimeOfDay) _findNextTrainTimes({
     required String lineId,
     required String departureStation,
     required String arrivalStation,
@@ -288,9 +249,10 @@ class TimetableController {
     int shiftCount = 0,
   }) {
     final jsonTrips = cachedTimetables[lineId];
-    if (jsonTrips == null || jsonTrips.isEmpty) {
-      return (baseTime, baseTime);
-    }
+    assert(
+      jsonTrips != null && jsonTrips.isNotEmpty,
+      '路線 [$lineId] の時刻表がロードされていません。',
+    );
 
     // ============================================================
     // 現在時刻
@@ -320,11 +282,6 @@ class TimetableController {
     }
 
     // ============================================================
-    // 基準日の曜日
-    // ============================================================
-    // final baseDayType = _dayTypeFromDate(baseDate);
-
-    // ============================================================
     // 基準日の時刻表を取得
     // ============================================================
     List<_TrainCandidate> getCandidates(DateTime date, int dayOffset) {
@@ -332,7 +289,7 @@ class TimetableController {
 
       final candidates = <_TrainCandidate>[];
 
-      for (final trip in jsonTrips) {
+      for (final trip in jsonTrips!) {
         if (trip.dayType != dayType) {
           continue;
         }

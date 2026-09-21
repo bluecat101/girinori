@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
 class TransitSegment {
-  List<String> lineNames;
+  List<String> lineIds;
   String departureStation;
   int duration;
   String arrivalStation;
   int walkTimeAfter;
 
   TransitSegment({
-    required this.lineNames, // 区間の路線名を保持する変数（複数の路線が存在する場合があるため、List<String>型）
+    required this.lineIds, // 区間の路線名を保持する変数（複数の路線が存在する場合があるため、List<String>型）
     required this.departureStation, // 区間の出発駅を保持する変数
     required this.duration, // 区間の所要時間（分）を保持する変数
     required this.arrivalStation, // 区間の到着駅を保持する変数
@@ -16,7 +16,7 @@ class TransitSegment {
   });
   Map<String, dynamic> toJson() {
     return {
-      'lineNames': lineNames,
+      'lineIds': lineIds,
       'departureStation': departureStation,
       'duration': duration,
       'arrivalStation': arrivalStation,
@@ -26,12 +26,22 @@ class TransitSegment {
 
   factory TransitSegment.fromJson(Map<String, dynamic> json) {
     return TransitSegment(
-      lineNames: List<String>.from(json['lineNames']),
+      lineIds: List<String>.from(json['lineNames']),
       departureStation: json['departureStation'],
       duration: json['duration'],
       arrivalStation: json['arrivalStation'],
       walkTimeAfter: json['walkTimeAfter'] ?? 0,
     );
+  }
+
+  // 区間の路線詳細名から路線名を抽出するメソッド
+  static String extractUniqueLineId(String fullLineId) {
+    return fullLineId.split('_').first;
+  }
+
+  // 区間の路線詳細名リストからユニークな路線名を抽出するメソッド
+  static List<String> extractUniqueLineIds(List<String> fullLineIds) {
+    return fullLineIds.map(extractUniqueLineId).toSet().toList();
   }
 }
 
@@ -67,9 +77,3 @@ class SegmentResult {
   final String lineName;
   SegmentResult({required this.dep, required this.arr, this.lineName = ''});
 }
-
-// class RouteResult {
-//   final List<SegmentResult> segmentResults;
-//   final int countdownMinutes;
-//   RouteResult({required this.segmentResults, required this.countdownMinutes});
-// }

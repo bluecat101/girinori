@@ -6,7 +6,7 @@ class RouteInputData {
   final TextEditingController nameController;
   final List<TextEditingController> viaStationControllers = [];
   final List<TextEditingController> walkTimeControllers = [];
-  final List<List<String>> selectedLineNames = []; // 絵期間ごとに複数の線を選択可能
+  final List<List<String>> selectedLineIds = []; // 絵期間ごとに複数の線を選択可能
 
   RouteInputData({required String defaultName})
     : nameController = TextEditingController(text: defaultName);
@@ -83,12 +83,12 @@ class RouteInputController {
     for (int i = 0; i < route.segments.length; i++) {
       final segment = route.segments[i];
       if (i == 0) {
-        inputData.selectedLineNames.add(segment.lineNames);
+        inputData.selectedLineIds.add(segment.lineIds);
       } else {
         inputData.viaStationControllers.add(
           TextEditingController(text: segment.departureStation),
         );
-        inputData.selectedLineNames.add(segment.lineNames);
+        inputData.selectedLineIds.add(segment.lineIds);
       }
       if (i < route.segments.length - 1) {
         inputData.walkTimeControllers.add(
@@ -109,7 +109,7 @@ class RouteInputController {
     formKey = GlobalKey<FormState>();
     final route = RouteInputData(defaultName: 'ルート 1');
     // 最初の区間の路線選択欄を用意する
-    route.selectedLineNames.add([]);
+    route.selectedLineIds.add([]);
     this.route = route;
   }
 
@@ -121,7 +121,7 @@ class RouteInputController {
     final route = currentRoute;
     route.viaStationControllers.add(TextEditingController());
     route.walkTimeControllers.add(TextEditingController(text: '3'));
-    route.selectedLineNames.add([]);
+    route.selectedLineIds.add([]);
   }
 
   // ============================================================
@@ -138,12 +138,12 @@ class RouteInputController {
     route.viaStationControllers.removeAt(viaIndex);
     route.walkTimeControllers.removeAt(viaIndex);
     // 経由駅を1つ削除すると、その駅に対応する路線を削除
-    if (viaIndex + 1 < route.selectedLineNames.length) {
-      route.selectedLineNames.removeAt(viaIndex + 1);
+    if (viaIndex + 1 < route.selectedLineIds.length) {
+      route.selectedLineIds.removeAt(viaIndex + 1);
     }
   }
 
-  List<String> getAvailableLineNames(int segmentIndex) {
+  List<String> getAvailableLineIds(int segmentIndex) {
     final route = currentRoute;
     // 範囲チェック
     assert(segmentIndex >= 0, 'segmentIndex is out of range: $segmentIndex');
@@ -165,7 +165,7 @@ class RouteInputController {
     }
 
     final String arrStation;
-    if (segmentIndex == route.selectedLineNames.length - 1) {
+    if (segmentIndex == route.selectedLineIds.length - 1) {
       arrStation = arrivalController.text.trim();
     } else {
       assert(
@@ -189,7 +189,7 @@ class RouteInputController {
         validLines.add(lineId);
       }
     });
-    return _extractUniqueLineNames(validLines);
+    return validLines;
   }
 
   // ============================================================
@@ -197,11 +197,11 @@ class RouteInputController {
   // ============================================================
   void selectLine(int segmentIndex, List<String> lineNames) {
     final route = currentRoute;
-    if (segmentIndex < 0 || segmentIndex >= route.selectedLineNames.length) {
+    if (segmentIndex < 0 || segmentIndex >= route.selectedLineIds.length) {
       return;
     }
 
-    route.selectedLineNames[segmentIndex] = lineNames;
+    route.selectedLineIds[segmentIndex] = lineNames;
   }
 
   // ============================================================
@@ -211,12 +211,12 @@ class RouteInputController {
     final route = currentRoute;
 
     final segments = <TransitSegment>[];
-    for (int i = 0; i < route.selectedLineNames.length; i++) {
+    for (int i = 0; i < route.selectedLineIds.length; i++) {
       final departureStation = i == 0
           ? departureController.text.trim()
           : route.viaStationControllers[i - 1].text.trim();
 
-      final arrivalStation = i == route.selectedLineNames.length - 1
+      final arrivalStation = i == route.selectedLineIds.length - 1
           ? arrivalController.text.trim()
           : route.viaStationControllers[i].text.trim();
 
@@ -227,7 +227,7 @@ class RouteInputController {
       segments.add(
         TransitSegment(
           departureStation: departureStation,
-          lineNames: route.selectedLineNames[i],
+          lineIds: route.selectedLineIds[i],
           duration: 15,
           arrivalStation: arrivalStation,
           walkTimeAfter: walkTime,
@@ -270,28 +270,18 @@ class RouteInputController {
     return currentRoute.walkTimeControllers[nodeIndex - 1];
   }
 
-  List<String> getSelectedLineNames(int segmentIndex) {
+  List<String> getSelectedLineIds(int segmentIndex) {
     final route = currentRoute;
-    if (segmentIndex < 0 || segmentIndex >= route.selectedLineNames.length) {
+    if (segmentIndex < 0 || segmentIndex >= route.selectedLineIds.length) {
       return [];
     }
-    return route.selectedLineNames[segmentIndex];
+    return route.selectedLineIds[segmentIndex];
   }
 
   void removeSelectedLines(int segmentIndex) {
-    final availableLineNames = getAvailableLineNames(segmentIndex);
-    final selectedLineNames = getSelectedLineNames(segmentIndex);
+    final availableLineIds = getAvailableLineIds(segmentIndex);
+    final selectedLineIds = getSelectedLineIds(segmentIndex);
 
-    selectedLineNames.removeWhere((line) => !availableLineNames.contains(line));
-  }
-
-  List<String> _extractUniqueLineNames(List<String> fullLineNames) {
-    return fullLineNames
-        .map((fullLineName) {
-          final lineName = fullLineName.split('_').first;
-          return lineName;
-        })
-        .toSet()
-        .toList();
+    selectedLineIds.removeWhere((line) => !availableLineIds.contains(line));
   }
 }

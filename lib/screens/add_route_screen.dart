@@ -130,12 +130,14 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                           builder: (context, _, child) {
                             return RouteLineNode(
                               segmentIndex: i,
-                              availableLineNames: _controller
-                                  .getAvailableLineNames(i),
-                              selectedLineNames: _controller
-                                  .getSelectedLineNames(i),
-                              onChanged: (newValue) {
-                                _controller.selectLine(i, newValue);
+                              availableLineIds: _controller.getAvailableLineIds(
+                                i,
+                              ),
+                              selectedLineIds: _controller.getSelectedLineIds(
+                                i,
+                              ),
+                              onChanged: (selectedLineNames) {
+                                _controller.selectLine(i, selectedLineNames);
                                 setState(() {});
                               },
                               selectedLineValid:
@@ -190,7 +192,7 @@ class _AddRouteScreenState extends State<AddRouteScreen> {
                       true,
                     );
                     for (int i = 0; i < _controller.totalNodes - 1; i++) {
-                      if (_controller.getSelectedLineNames(i).isEmpty) {
+                      if (_controller.getSelectedLineIds(i).isEmpty) {
                         selectedLineValid[i] = false;
                         allValid = false;
                       }

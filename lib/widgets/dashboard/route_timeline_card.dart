@@ -62,8 +62,8 @@ class _RouteTimelineCardState extends State<RouteTimelineCard> {
       // この区間のシフト数のキーを作成して取得する
       final shiftCount = _segmentShiftCounts[i];
       final SegmentResult segmentResult = widget.timetableController
-          .findNextTrainTimesByLineNames(
-            lineNames: segment.lineNames,
+          .findNextTrainTimesByLineIds(
+            lineIds: segment.lineIds,
             departureStation: segment.departureStation,
             arrivalStation: segment.arrivalStation,
             baseTime: _segmentBaseTimes[i],
@@ -160,7 +160,9 @@ class _RouteTimelineCardState extends State<RouteTimelineCard> {
                       ),
                       LineRow(
                         displayLineName: _formatLineName(
-                          _route.segments[i].lineNames,
+                          TransitSegment.extractUniqueLineIds(
+                            _route.segments[i].lineIds,
+                          ),
                           i,
                         ),
                         lineColor: widget.lineController.lineColor(

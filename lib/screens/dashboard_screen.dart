@@ -142,10 +142,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _initRoutes(List<TransitRoute> routes) async {
     for (final route in routes) {
       for (final segment in route.segments) {
-        if (segment.lineNames.isNotEmpty) {
-          await _timetableController.loadTimetableFileFormLineName(
-            segment.lineNames,
-          );
+        if (segment.lineIds.isNotEmpty) {
+          await _timetableController.loadTimetableFileForLines(segment.lineIds);
         }
       }
       myRoutes.add(route);
@@ -178,10 +176,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in newRoute.segments) {
-      if (segment.lineNames.isNotEmpty) {
-        await _timetableController.loadTimetableFileFormLineName(
-          segment.lineNames,
-        );
+      if (segment.lineIds.isNotEmpty) {
+        await _timetableController.loadTimetableFileForLines(segment.lineIds);
       }
     }
     setState(() {
@@ -218,10 +214,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isLoading = true;
     });
     for (final segment in updatedRoute.segments) {
-      if (segment.lineNames.isNotEmpty) {
-        await _timetableController.loadTimetableFileFormLineName(
-          segment.lineNames,
-        );
+      if (segment.lineIds.isNotEmpty) {
+        await _timetableController.loadTimetableFileForLines(segment.lineIds);
       }
     }
     setState(() {
@@ -379,8 +373,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     for (final segment in segments) {
       final SegmentResult segmentResult = timetableController
-          .findNextTrainTimesByLineNames(
-            lineNames: segment.lineNames,
+          .findNextTrainTimesByLineIds(
+            lineIds: segment.lineIds,
             departureStation: segment.departureStation,
             arrivalStation: segment.arrivalStation,
             baseTime: baseTime,
