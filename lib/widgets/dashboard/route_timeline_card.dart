@@ -28,6 +28,7 @@ class RouteTimelineCard extends StatefulWidget {
 class _RouteTimelineCardState extends State<RouteTimelineCard> {
   late TransitRoute _route;
   int startUpdateIndex = 0;
+  bool isLookingBackward = false; // 過去の列車を探すかどうかのフラグ
   List<int> _segmentShiftCounts = [];
   List<TimeOfDay> _segmentBaseTimes = [];
   // 表示するための出発時刻、到着時刻、路線名を格納するリストを作成
@@ -67,19 +68,24 @@ class _RouteTimelineCardState extends State<RouteTimelineCard> {
             departureStation: segment.departureStation,
             arrivalStation: segment.arrivalStation,
             baseTime: _segmentBaseTimes[i],
-            shiftCount: shiftCount,
+            isLookingBackward: i == startUpdateIndex
+                ? isLookingBackward
+                : shiftCount <
+                      0, // 最初の区間は isLookingBackward を使用し、それ以降はシフト数がマイナスかどうかで判断
           );
-
       _departureTimes[i] = segmentResult.dep;
       _arrivalTimes[i] = segmentResult.arr;
       _lineNames[i] = segmentResult.lineName;
 
+      // 区間の基準時刻を更新する
+      _segmentBaseTimes[i] = segmentResult.dep;
       // 次の乗り換えがある場合は、本物の到着時刻に徒歩時間を足す
       if (i < _route.segments.length - 1) {
         _segmentBaseTimes[i + 1] = widget.timetableController.addMinutes(
           segmentResult.arr,
           segment.walkTimeAfter,
         );
+        _segmentShiftCounts[i + 1] = 0; // 次の区間のシフト数をリセット
       }
     }
 
@@ -207,9 +213,10 @@ class _RouteTimelineCardState extends State<RouteTimelineCard> {
           : currentShift - 1;
       // 更新開始インデックスを設定して、次回のビルド時にその区間から再計算する
       startUpdateIndex = segmentIndex;
+      isLookingBackward = !isNext;
 
       // 基準時刻を更新する
-      widget.timetableController.addMinutes(
+      _segmentBaseTimes[segmentIndex] = widget.timetableController.addMinutes(
         _segmentBaseTimes[segmentIndex],
         isNext ? 1 : -1,
       );

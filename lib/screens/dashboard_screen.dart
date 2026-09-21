@@ -378,10 +378,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
             departureStation: segment.departureStation,
             arrivalStation: segment.arrivalStation,
             baseTime: baseTime,
-            shiftCount: 0,
           );
       results.add(segmentResult);
-
       // 次の区間は「到着＋徒歩時間」から検索
       baseTime = timetableController.addMinutes(
         segmentResult.arr,

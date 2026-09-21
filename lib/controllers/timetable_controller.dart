@@ -179,7 +179,7 @@ class TimetableController {
     required String departureStation,
     required String arrivalStation,
     required TimeOfDay baseTime,
-    int shiftCount = 0, // プラマイで「次へ」「前へ」を判定する例
+    bool isLookingBackward = false,
   }) {
     // 出発駅の路線情報を取得
     final depLineIds = routeMaster[departureStation]?.keys.toList();
@@ -194,9 +194,6 @@ class TimetableController {
     int? targetDiff; // 基準からの差分の最小値を保持する変数
     final int baseMinutes = baseTime.hour * 60 + baseTime.minute;
 
-    // shiftCount がマイナスなら「過去（前へ）」、0以上なら「未来（次へ）」を探すフラグ
-    final bool isLookingBackward = shiftCount < 0;
-
     for (final lineId in lineIds) {
       // 内部の単道路線検索を呼び出す
       final (TimeOfDay dep, TimeOfDay arr) = _findNextTrainTimes(
@@ -204,7 +201,7 @@ class TimetableController {
         departureStation: departureStation,
         arrivalStation: arrivalStation,
         baseTime: baseTime,
-        shiftCount: shiftCount,
+        isLookingBackward: isLookingBackward,
       );
       if (dep != baseTime || arr != baseTime) {
         int depMinutes = dep.hour * 60 + dep.minute;
@@ -246,7 +243,7 @@ class TimetableController {
     required String departureStation,
     required String arrivalStation,
     required TimeOfDay baseTime, // 始発終電に関わらず、0 ~ 1440の範囲で定義される
-    int shiftCount = 0,
+    required bool isLookingBackward, // 過去の列車を探すかどうかのフラグ
   }) {
     final jsonTrips = cachedTimetables[lineId];
     assert(
@@ -350,29 +347,36 @@ class TimetableController {
 
     // ============================================================
     // 基準列車を探す
-    // 基準の時間（normalizedBaseMinutes）以降で最初の列車を探す
     // ============================================================
-    int baseIndex = -1;
-    for (int i = 0; i < candidates.length; i++) {
-      if (candidates[i].departureMinutes >= normalizedBaseMinutes) {
-        baseIndex = i;
-        break;
+    int targetIndex = -1;
+
+    if (!isLookingBackward) {
+      // 🔀 【未来（次へ）を探す場合】
+      // 基準時間（normalizedBaseMinutes）「以降」で最初の列車を探す
+      for (int i = 0; i < candidates.length; i++) {
+        if (candidates[i].departureMinutes >= normalizedBaseMinutes) {
+          targetIndex = i;
+          break;
+        }
+      }
+    } else {
+      // 🔙 【過去（1本前）を探す場合】
+      // 基準時間（normalizedBaseMinutes）「以前」で、一番後ろ（直前の列車）を探す
+      for (int i = candidates.length - 1; i >= 0; i--) {
+        if (candidates[i].departureMinutes <= normalizedBaseMinutes) {
+          targetIndex = i;
+          break;
+        }
       }
     }
 
-    // assert(baseIndex != -1, '時刻表から検索できませんでした。');
+    // 万が一見つからなかった場合の安全ガード
+    if (targetIndex == -1) {
+      targetIndex = isLookingBackward ? 0 : candidates.length - 1;
+    }
 
-    // ============================================================
-    // shiftCount
-    // ============================================================
-    int targetIndex = baseIndex + shiftCount;
-    if (targetIndex < 0) {
-      targetIndex = 0;
-    }
-    if (targetIndex >= candidates.length) {
-      targetIndex = candidates.length - 1;
-    }
-    final target = candidates[targetIndex];
+    final dep = candidates[targetIndex].departureMinutes;
+    final arr = candidates[targetIndex].arrivalMinutes;
 
     _hasNextTimeTable = (targetIndex != candidates.length - 1);
     _hasPreviousTimeTable = (targetIndex != 0);
@@ -380,12 +384,12 @@ class TimetableController {
     // ============================================================
     // TimeOfDayへ変換
     // ============================================================
-    final departureTime = convertToTimeOfDay(target.departureMinutes);
-    final arrivalTime = convertToTimeOfDay(target.arrivalMinutes);
+    final departureTime = _convertToTimeOfDay(dep);
+    final arrivalTime = _convertToTimeOfDay(arr);
     return (departureTime, arrivalTime);
   }
 
-  TimeOfDay convertToTimeOfDay(int minutes) {
+  TimeOfDay _convertToTimeOfDay(int minutes) {
     minutes = minutes % 1440; // 24時間を超える場合は繰り返す
     return TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60);
   }
