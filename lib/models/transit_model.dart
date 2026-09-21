@@ -52,6 +52,15 @@ class TransitRoute {
 
   TransitRoute({required this.id, required this.name, required this.segments});
 
+  /// TransitRouteのコピーを作成する
+  TransitRoute copy() {
+    return TransitRoute(
+      id: id,
+      name: name,
+      segments: List<TransitSegment>.from(segments),
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

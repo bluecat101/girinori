@@ -118,6 +118,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       position: position,
       items: [
         PopupMenuItem(value: 'edit', child: const Text('編集')),
+        PopupMenuItem(value: 'copy', child: const Text('コピー')),
         PopupMenuItem(value: 'delete', child: const Text('削除')),
         PopupMenuItem(
           value: 'widget',
@@ -128,6 +129,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       switch (value) {
         case 'edit':
           _editRoute(index);
+          break;
+        case 'copy':
+          final copiedRoute = route.copy();
+          myRoutes.add(copiedRoute);
+          _editRoute(myRoutes.length - 1);
           break;
         case 'delete':
           _deleteRoute(route);
@@ -172,9 +178,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (newRoute == null) {
       return;
     }
-    setState(() {
-      _isLoading = true;
-    });
     for (final segment in newRoute.segments) {
       if (segment.lineIds.isNotEmpty) {
         await _timetableController.loadTimetableFileForLines(segment.lineIds);
@@ -182,7 +185,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     setState(() {
       myRoutes.add(newRoute);
-      _isLoading = false;
     });
     // widgetを更新
     await _updateWidgetForRoute();
@@ -221,6 +223,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await _updateWidgetForRoute();
     _saveRouteToStorage();
   }
+
+  // Future<void> _copyRoute(TransitRoute route) async {
+  //   final newRoute = await Navigator.push<TransitRoute>(
+  //     context,
+  //     MaterialPageRoute(
+  //       builder: (context) => UpdateRouteScreen(editingRoute: route),
+  //     ),
+  //   );
+
+  //   if (newRoute == null) return;
+
+  //   for (final segment in newRoute.segments) {
+  //     if (segment.lineIds.isNotEmpty) {
+  //       await _timetableController.loadTimetableFileForLines(segment.lineIds);
+  //     }
+  //   }
+  //   setState(() {
+  //     myRoutes.add(newRoute);
+  //   });
+  //   await _updateWidgetForRoute();
+  //   _saveRouteToStorage();
+  // }
 
   PreferredSizeWidget _buildAppBar() {
     return AppBar(
