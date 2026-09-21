@@ -207,12 +207,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         builder: (context) => AddRouteScreen(editingRoute: myRoutes[index]),
       ),
     );
-    if (updatedRoute == null) {
-      return;
-    }
-    setState(() {
-      _isLoading = true;
-    });
+
+    if (updatedRoute == null) return;
+
     for (final segment in updatedRoute.segments) {
       if (segment.lineIds.isNotEmpty) {
         await _timetableController.loadTimetableFileForLines(segment.lineIds);
@@ -220,8 +217,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     setState(() {
       myRoutes[index] = updatedRoute;
-
-      _isLoading = false;
     });
     await _updateWidgetForRoute();
     _saveRouteToStorage();
